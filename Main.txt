@@ -1,4 +1,4 @@
-Uses SysUtils, RegExpr;
+Uses SysUtils, RegExpr, Classes;
 
 type
 	TStringArray = array of string;
@@ -6,7 +6,6 @@ const
 	Path = 'E:\Games\Lineage\Bot\Scripts\';
 	PLs: array of string = ['Garosh', 'Xeil', 'Asgar', 'Drill'];
 	RaidBosses: array of string = ['Антарас', 'Валакас', 'Баюм', 'Квин Ант', 'Anakazel', 'Ember'];
-	TG_API_Key = '27d9d945998a637bf763a26ade783f2d';
 	NoExchangeFunCoin: array of string = ['Max', 'L2TopTrader', 'Erf', 'Ragn']; // Не менять адену на Fun coin
 	Prophet = 'Sarr'; BD = 'Dave'; SWS = 'Lycor';
 	Bishop = 'Yume'; Spoiler = 'Drill';
@@ -30,7 +29,7 @@ const
 	];
 
 var
-	PL, CurrentClass, CurrentClassType, FarmTarget: string;
+	PL, CurrentClass, CurrentClassType, FarmTarget, TG_API_Key: string;
 	Initial: boolean;
 	CharacterIsBusy, SuccessfulSpoil: boolean;
 	ChatQ_Sender, ChatQ_Text: array of string; ChatQ_Type: array of Integer; ChatThreadRunning: boolean;
@@ -2389,15 +2388,19 @@ end;
 procedure UpdateAliveBosses(const NewAliveRB: TStringArray);
 var
 	OldAliveRB: TStringArray;
-	i: Integer;
+	i: Integer; _TG_API_Key: string;
 begin
+	_TG_API_Key := GetGlobalStrVar(TG_API_Key);
+	if _TG_API_Key = '' then
+		Exit;
+	
 	// Для инициализации
 	if Length(AliveRB) = 0 then begin
 		AliveRB := NewAliveRB;
 		
 		for i := 0 to High(AliveRB) do begin
 			if IsInArrayTStringArray(AliveRB[i], RaidBosses) then begin
-				SendToTelegram(TG_API_Key, 'RB Alive (init): ' + AliveRB[i]);
+				SendToTelegram(_TG_API_Key, 'RB Alive (init): ' + AliveRB[i]);
 			end;
 		end;
 		
@@ -2410,7 +2413,7 @@ begin
 	// новые живые (их раньше не было) -> print
 	for i := 0 to High(NewAliveRB) do
 		if (not IsInArrayTStringArray(NewAliveRB[i], OldAliveRB)) and IsInArrayTStringArray(NewAliveRB[i], RaidBosses) then
-			SendToTelegram(TG_API_Key, 'RB Respawn: ' + NewAliveRB[i]);
+			SendToTelegram(_TG_API_Key, 'RB Respawn: ' + NewAliveRB[i]);
 
 	// обновить общий список
 	AliveRB := NewAliveRB;
@@ -3201,6 +3204,45 @@ begin
 	Result := Integer(GetTickCount - Target) >= 0;
 end;
 
+function ReadSecret(const Key: string): string;
+var
+	SL: TStringList; I, p: Integer;
+	SecretsFile, Line, K, V: string;
+begin
+	// Секреты хранятся в файле secrets.env
+	// Пример: TG_API_Key=27d9d945998a637bf763a26ade783f2d
+	
+	Result := '';
+	SecretsFile := Path + 'secrets.env';
+	
+	if not FileExists(SecretsFile) then begin
+		Print('Secrets file not found: ' + SecretsFile);
+		Exit;
+	end;
+	
+	SL := TStringList.Create;
+	try
+		SL.LoadFromFile(SecretsFile);
+		for I := 0 to SL.Count - 1 do begin
+			Line := Trim(SL[I]);
+			if (Length(Line) = 0) or (Line[1] = '#') then Continue;
+
+			p := Pos('=', Line);
+			if p <= 1 then Continue;
+
+			K := Trim(Copy(Line, 1, p-1));
+			V := Trim(Copy(Line, p+1, MaxInt));
+
+			if SameText(K, Key) then begin
+				Result := V;
+				Exit;
+			end;
+		end;
+	finally
+		SL.Free;
+	end;
+end;
+
 // Debug +
 procedure PrintStringTStringArray(const Title: string; const A: TStringArray);
 var
@@ -3715,6 +3757,7 @@ begin
 		DestroComboThreadEnabled := false;
 		DestroWeaponChangeThreadEnabled := false;
 		ChatThreadRunning := false;
+		TG_API_Key := ReadSecret('TG_API_Key');
 	finally
 		Script.Unlock;
 	end;
