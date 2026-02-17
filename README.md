@@ -1,3 +1,44 @@
-Main.txt - основной скрипт для фарма ( https://www.youtube.com/playlist?list=PLRMP3WCyF0ytsndAwVguU33YBhccW2Lih )
+#### Коллекция скриптов и заготовок для автоматизации рутинных действий. **Это не “готовый продукт”**, а скорее набор примеров и инструментов, которые можно использовать в собственной разработке.
 
-Enchanting.txt - скрипт для заточки ( https://www.youtube.com/watch?v=C9MyK_ICbnA )
+---
+
+## Enchanting.txt
+> Скрипт для автоматизированной заточки предметов: https://www.youtube.com/watch?v=C9MyK_ICbnA
+
+---
+
+## Main.txt
+> Основной скрипт для фарма: https://www.youtube.com/playlist?list=PLRMP3WCyF0ytsndAwVguU33YBhccW2Lih  
+> В скрипте присутствует хардкод никнеймов, и особенности работы конкретного сервера, не нужно применять его без адаптации.
+
+### FarmTarget:
+
+#### Соло варианты
+
+| Target | Описание | Примечание / цель |
+|---|---|---|
+| `DinoStriders` | Фарм поля на Дино Острове, справа от респа | Квест на топ А вепы |
+| `StakatoNest` | Циклический маршрут по Стакато | Фарм основных ресурсов |
+| `VarkaFarm` | Фарм Varka Village | Спойл Mold Lubricant, квест на S броню |
+| `FOGFarm` | Фарм Fog Lower | Квест на Рецепты S Weapon |
+| `DisciplesNecropolis` | Циклический маршрут по Дисайплесу | Ancient Adena, Scroll of Ancient Magic |
+| `TTRecipeQuest` | Захардкоженный циклический фарм Hot Springs спойлером | Enria; DMP; Enchant Armor: Grade A |
+| `FreeFarm` | Произвольный вариант фарма любой локации |  |
+| `Deleveling %ТребуемыйУровень%` | Персонаж циклично умирает, пока не достигнет необходимого уровня | Например Deleveling 43 |
+
+#### Рейд-режим
+
+| Target | Описание | Примечание / цель |
+|---|---|---|
+| `Raid (без дополнительных параметров)` | Подгружает рейдовые настройки, включает режим боя |  |
+| `Raid AQ` | Автоматизированный фарм Ant Queen | https://www.youtube.com/live/BJ2XTF7lgoc |
+
+
+#### Групповой режим
+
+| Target | Описание | Примечание / цель |
+|---|---|---|
+| `Party (без дополнительных параметров)` | Подгружает групповые настройки, включает режим боя |  |
+| `Party FOGFarm` | Фарм FOG Lower совместно с спойлером | Рецепты S Weapon; Enchant Weapon: Grade S |
+
+---

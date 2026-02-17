@@ -265,7 +265,7 @@ begin
 				FOGFarm();
 			end
 			else if (_FarmTarget = 'TTRecipeQuest') then begin
-				TTRecipeQuest();
+				TTRecipeQuest(true);
 				Continue;
 			end
 			else if (_FarmTarget = 'FreeFarm') then begin
@@ -332,6 +332,9 @@ begin
 				
 				if Contains(_FarmTarget, 'FOGFarm') then begin
 					if not FOGFarm() then Continue;
+				end
+				else if Contains(_FarmTarget, 'DinoTyrFarm') then begin
+					DinoTyrFarm();
 				end
 				else begin
 					Print('Неизвестная настройка: '+_FarmTarget);
@@ -1178,6 +1181,8 @@ procedure DinoTyrFarm();
 var
 	_CurrentClass: string;
 begin
+	StartCombat();
+	PartyExecuteEntry('StartCombat');
 	{Print('DinoTyrFarm запущен');
 	_CurrentClass := GetGlobalStrVar(CurrentClass);
 	if ((_CurrentClass <> 'Destroyer') and (_CurrentClass <> 'Bishop')) and (Engine.Status <> lsOnline) then begin
@@ -2673,24 +2678,41 @@ begin
 	
 	// SH
 	if (_CurrentClass = 'SpellHowler') then begin
-		if (_FarmTarget = 'StakatoNest') or (_FarmTarget = 'DisciplesNecropolis') then begin
-			FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
-		end else if (_FarmTarget = 'VarkaFarm') then begin
-			FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
-			ZoneFile := Path+'Zones\Varka.zmap';
-		end else if (_FarmTarget = 'FOGFarm') then begin
-			FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
-			ZoneFile := Path+'Zones\FOG_Lower.zmap';
-		end else if Contains(_FarmTarget, 'Raid') then begin
+		
+		if Contains(_FarmTarget, 'Raid') then begin
+			
+			// Raid
 			FileName := Path+'Settings\SHs_Raid.xml';
-		end else if Contains(_FarmTarget, 'Party') then begin
+			
+		end
+		else if Contains(_FarmTarget, 'Party') then begin
+			
+			// Party
+			FileName := Path+'Settings\SHs_Party_Farm.xml';
 			if Contains(_FarmTarget, 'FOGFarm') then begin
-				FileName := Path+'Settings\SHs_Party_Farm.xml';
 				ZoneFile := Path+'Zones\FOG_Lower.zmap';
-			end else
-				FileName := Path+'Settings\SHs_Party_Farm.xml';
-		end else
-			FileName := Path+'Settings\SHs_Farm.xml';
+			end
+			else if Contains(_FarmTarget, 'DinoTyrFarm') and (User.Name = 'Vaeris') then begin
+				FileName := Path+'Settings\SHs_Tyr_Leader.xml';
+			end;
+			
+		end
+		else begin
+			
+			// Solo
+			if (_FarmTarget = 'StakatoNest') or (_FarmTarget = 'DisciplesNecropolis') then begin
+				FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
+			end else if (_FarmTarget = 'VarkaFarm') then begin
+				FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
+				ZoneFile := Path+'Zones\Varka.zmap';
+			end else if (_FarmTarget = 'FOGFarm') then begin
+				FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
+				ZoneFile := Path+'Zones\FOG_Lower.zmap';
+			end else begin
+				FileName := Path+'Settings\SHs_Farm.xml';
+			end;
+			
+		end;
 	end;
 	
 	// Sorcerers
@@ -2724,18 +2746,24 @@ begin
 	// Spoiler
 	if (_CurrentClass = 'Spoiler') then begin
 		if Contains(_FarmTarget, 'Party') then begin
+			
+			// Party
 			if Contains(_FarmTarget, 'FOGFarm') then begin
 				FileName := Path+'Settings\Spoiler_FOGFarm.xml';
 				ZoneFile := Path+'Zones\FOG_Lower.zmap';
 			end else
 				FileName := Path+'Settings\Spoiler_Leader.xml';
+				
 		end
 		else begin
+			
+			// Solo
 			if (_FarmTarget = 'VarkaFarm') then begin
 				FileName := Path+'Settings\Spoiler_Varka.xml';
 				ZoneFile := Path+'Zones\Varka.zmap';
 			end else
 				FileName := Path+'Settings\Spoiler.xml';
+				
 		end;
 	end;
 	
