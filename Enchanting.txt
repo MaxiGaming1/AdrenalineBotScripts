@@ -1,0 +1,560 @@
+uses SysUtils, Classes, Controls, Forms, StdCtrls;
+
+// GUI +
+type
+  TEnchantingForm = class(TForm)
+  private
+    EdItemID, EdMax, EdCount: TEdit;
+    CbBlessed: TCheckBox;
+    BtnRun: TButton;
+    procedure BtnRunClick(Sender: TObject);
+  public
+    constructor Create(AOwner: TComponent); override;
+  end;
+
+const
+	STAT_CAP = 20; // Максимальный уровень для сбора статистики
+var
+  EnchForm: TEnchantingForm = nil;
+  gItemID, gMaxEnchant, gMinItemCount: Integer; gUseBlessed: Boolean;
+  gStatMaxLvl: Integer = 0;
+  gStatTries: array[0..STAT_CAP] of Integer;
+  gStatOk: array[0..STAT_CAP] of Integer;
+
+constructor TEnchantingForm.Create(AOwner: TComponent);
+var
+  LblItemID, LblMax, LblCount: TLabel;
+  Y, Gap, RowH: Integer;
+begin
+  inherited Create(AOwner);
+
+  Caption := 'Enchanting';
+  Position := poScreenCenter;
+  Width := 350;
+
+  Gap := 10;     // общий вертикальный отступ между блоками
+  RowH := 30;    // высота "строки" (лейбл+инпут)
+
+  Y := 12;       // стартовая позиция по Y
+
+  // 1) ItemID
+  LblItemID := TLabel.Create(Self);
+  LblItemID.Parent := Self;
+  LblItemID.Caption := 'ItemID (AM - 6579):';
+  LblItemID.Left := 12;
+  LblItemID.Top := Y + 4;
+
+  EdItemID := TEdit.Create(Self);
+  EdItemID.Parent := Self;
+  EdItemID.Left := 140;
+  EdItemID.Top := Y;
+  EdItemID.Width := 170;
+  EdItemID.Text := '6579';
+
+  Inc(Y, RowH);
+
+  // 2) Максимальная заточка
+  LblMax := TLabel.Create(Self);
+  LblMax.Parent := Self;
+  LblMax.Caption := 'Максимальная заточка:';
+  LblMax.Left := 12;
+  LblMax.Top := Y + 4;
+
+  EdMax := TEdit.Create(Self);
+  EdMax.Parent := Self;
+  EdMax.Left := 140;
+  EdMax.Top := Y;
+  EdMax.Width := 170;
+  EdMax.Text := '16';
+
+  Inc(Y, RowH);
+
+  // 3) Количество предметов
+  LblCount := TLabel.Create(Self);
+  LblCount.Parent := Self;
+  LblCount.Caption := 'Количество предметов:';
+  LblCount.Left := 12;
+  LblCount.Top := Y + 4;
+
+  EdCount := TEdit.Create(Self);
+  EdCount.Parent := Self;
+  EdCount.Left := 140;
+  EdCount.Top := Y;
+  EdCount.Width := 170;
+  EdCount.Text := '3';
+
+  Inc(Y, RowH);
+
+  // 4) Blessed Scrolls
+  CbBlessed := TCheckBox.Create(Self);
+  CbBlessed.Parent := Self;
+  CbBlessed.Caption := 'Blessed Scrolls';
+  CbBlessed.Left := 12;
+  CbBlessed.Top := Y + 2;
+  CbBlessed.Checked := False;
+
+  Inc(Y, 22 + Gap); // чекбокс ниже по высоте, поэтому отдельная прибавка
+
+  // 5) Кнопка
+  BtnRun := TButton.Create(Self);
+  BtnRun.Parent := Self;
+  BtnRun.Caption := 'Выполнить';
+  BtnRun.Left := 12;
+  BtnRun.Top := Y;
+  BtnRun.Width := 298;
+  BtnRun.Height := 30;
+  BtnRun.OnClick := BtnRunClick;
+
+  Inc(Y, BtnRun.Height + 12);
+
+  // Подгоняем высоту формы под контент
+  ClientHeight := Y;
+end;
+
+procedure TEnchantingForm.BtnRunClick(Sender: TObject);
+var
+  ItemID, MaxEnchant, MinItemCount: Integer;
+  UseBlessed: Boolean;
+begin
+  ItemID        := StrToIntDef(Trim(EdItemID.Text), -1);
+  MaxEnchant    := StrToIntDef(Trim(EdMax.Text), -1);
+  MinItemCount  := StrToIntDef(Trim(EdCount.Text), -1);
+  UseBlessed    := CbBlessed.Checked;
+
+  if ItemID <= 0 then begin
+    Print('Enchanting: некорректный ItemID');
+    Exit;
+  end;
+
+  if MaxEnchant <= 0 then begin
+    Print('Enchanting: некорректная "Максимальная заточка"');
+    Exit;
+  end;
+
+  if MinItemCount <= 0 then begin
+    Print('Enchanting: некорректное "Количество предметов"');
+    Exit;
+  end;
+
+  Print('Enchant: ItemID=' + IntToStr(ItemID) +
+        ', MaxEnchant=' + IntToStr(MaxEnchant) +
+        ', MinCount=' + IntToStr(MinItemCount) +
+        ', BlessedScrolls=' + BoolToStr(UseBlessed));
+
+  Script.Lock;
+  try
+	gItemID := ItemID;
+	gMaxEnchant := MaxEnchant;
+	gMinItemCount := MinItemCount;
+	gUseBlessed := UseBlessed;
+  finally
+	Script.Unlock;
+  end;
+
+  Script.NewThread(@EnchantingExecutionThread);
+
+  Close;
+end;
+
+procedure EnchantingGUI;
+begin
+  if (EnchForm <> nil) then begin
+    EnchForm.BringToFront;
+    Exit;
+  end;
+
+  EnchForm := TEnchantingForm.Create(Application);
+  try
+    EnchForm.ShowModal;
+  finally
+    EnchForm.Free;
+    EnchForm := nil;
+  end;
+end;
+
+function BoolToStr(const V: boolean): string;
+begin
+	if V then
+		Result := 'True'
+	else
+		Result := 'False';
+end;
+// GUI -
+
+// ===== main =====
+procedure EnchantingExecution(ItemID, MaxEnchant, MinItemCount: Integer; UseBlessed: Boolean);
+var
+  It: TL2Item; Obj: TL2Object;
+  Grade, ItemType: Cardinal;
+  TotalCnt, ScrollID: Integer;
+  MaxedCnt, NeedKeep, BelowCnt: Integer;
+  MinLvl, MaxLvl: Integer; Candidate: TL2Item;
+begin
+
+  // Инициализация статистики
+  EnchantStatsInit(MaxEnchant);
+  
+  // Проверяем, что общего кол-ва предметов больше, чем MinItemCount
+  TotalCnt := ItemCountByID(ItemID);
+  if TotalCnt <= MinItemCount then begin
+    Print('Enchanting: предметов ItemID=' + IntToStr(ItemID) +
+          ' всего ' + IntToStr(TotalCnt) +
+          ', меньше MinItemCount=' + IntToStr(MinItemCount)
+	);
+    Exit;
+  end;
+
+  // Берем Grade и ItemType (оружие/броня) у первого найденного предмета
+  Inventory.User.ByID(ItemID, It);
+  if (It = nil) then begin
+    Print('Enchanting: ItemID=' + IntToStr(ItemID) + ' не найден в Inventory.User');
+    Exit;
+  end;
+
+  Grade := It.Grade;
+  ItemType := It.ItemType;
+
+  // По Grade + типу + UseBlessed получаем ScrollID
+  ScrollID := GetScrollID(Grade, ItemType, UseBlessed);
+  if ScrollID = 0 then begin
+    Print('Enchanting: не задан ScrollID для Grade=' + IntToStr(Grade) +
+          ', ItemType=' + IntToStr(ItemType) +
+          ', UseBlessed=' + BoolToStr(UseBlessed)
+	);
+    Exit;
+  end;
+
+  // Главный цикл: крутимся пока
+  // 1) не все стали MaxEnchant
+  // 2) и пока BelowCnt не сравнялось с NeedKeep
+  while Delay(500) do begin
+	if Engine.Status <> lsOnline then begin
+	  EnchantStatsPrint;
+      Exit;
+    end;
+	
+    // пересчёт на каждом круге (предметы/скроллы могли сломаться/доточиться)
+    TotalCnt := ItemCountByID(ItemID);
+    if TotalCnt = 0 then begin
+      Print('Enchanting: предметы ItemID=' + IntToStr(ItemID) + ' закончились.');
+	  EnchantStatsPrint;
+      Exit;
+    end;
+	
+	TotalCnt := ItemCountByID(ScrollID);
+    if TotalCnt = 0 then begin
+      Print('Enchanting: предметы ScrollID=' + IntToStr(ScrollID) + ' закончились.');
+	  EnchantStatsPrint;
+      Exit;
+    end;
+
+    MaxedCnt := CountByID_EnchantGE(ItemID, MaxEnchant);
+    NeedKeep := MinItemCount - MaxedCnt;
+    if NeedKeep < 0 then
+      NeedKeep := 0;
+
+    BelowCnt := CountByID_EnchantLT(ItemID, MaxEnchant);
+
+    // условие выхода №1: все доточены
+    if BelowCnt = 0 then begin
+      Print('Enchanting: готово. Все предметы ItemID=' + IntToStr(ItemID) +
+            ' имеют EnchantLevel >= ' + IntToStr(MaxEnchant));
+	  EnchantStatsPrint;
+      Exit;
+    end;
+
+    // условие выхода №2: дошли до "остатка" (нельзя дальше рисковать)
+    if BelowCnt <= NeedKeep then begin
+      Print('Enchanting: стоп по лимиту. BelowCnt=' + IntToStr(BelowCnt) +
+            ' <= NeedKeep=' + IntToStr(NeedKeep) +
+            ' (MinItemCount=' + IntToStr(MinItemCount) +
+            ', MaxedCnt=' + IntToStr(MaxedCnt) + ')');
+	  EnchantStatsPrint;
+      Exit;
+    end;
+	
+	// Заточка
+    GetMinMaxEnchant(ItemID, MaxEnchant, MinLvl, MaxLvl);
+    if MinLvl<0 then begin
+	  Print('Enchanting: нет подходящих предметов');
+	  EnchantStatsPrint;
+	  Exit;
+	end;
+	
+    if not FindMinEnchantItem(ItemID, MinLvl, MaxEnchant, Candidate) then begin
+	  Print('Enchanting: кандидат не найден');
+	  EnchantStatsPrint;
+	  Exit;
+	end;
+	
+    if not EnchantOneStep(ScrollID, Candidate.OID, Candidate.EnchantLevel) then begin
+	  Print('Ошибка EnchantOneStep');
+	  EnchantStatsPrint;
+	  Exit;
+	end;
+	
+  end;
+
+end;
+
+// ===== helpers =====
+procedure GetMinMaxEnchant(const AID, MaxEnchant: Integer; out MinLvl, MaxLvl: Integer);
+var i,l: Integer; It: TL2Item;
+begin
+  MinLvl:= MaxInt; MaxLvl:= -1;
+  for i:=0 to Inventory.User.Count-1 do begin
+    It:= Inventory.User.Items(i);
+	
+	if (It = nil) then Continue;
+    if (It.ID<>AID) then Continue;
+	
+    l:= It.EnchantLevel;
+    if l<MinLvl then MinLvl:= l;
+    if l>MaxLvl then MaxLvl:= l;
+  end;
+  if MaxLvl=-1 then MinLvl:= -1; // ничего не найдено
+end;
+
+function FindMinEnchantItem(const AID, MinLvl, MaxEnchant: Integer; out It: TL2Item): Boolean;
+var i: Integer; t: TL2Item;
+begin
+  Result:= False;
+  It:= nil;
+  
+  for i:=0 to Inventory.User.Count-1 do begin
+    t:= Inventory.User.Items(i);
+    if (t.ID=AID) and (t.EnchantLevel=MinLvl) and (t.EnchantLevel<MaxEnchant) then begin
+      It:= t;
+	  Result:= True;
+	  Exit;
+    end;
+  end;
+end;
+
+function EnchantOneStep(const ScrollID: Integer; const ItemOID: Cardinal; const FromLvl: Integer): Boolean;
+var
+  Act: TL2Action;
+  P1, P2: Pointer;
+  MsgId, t0: Cardinal;
+begin
+  Result := false;
+  if not Engine.UseItem(ScrollID) then Exit;
+  Delay(250);
+  
+  // C->S ID1=$5800 ID2=$0000 Data=615C0110 - ItemOID
+  Engine.SendToServer('58'+MemToHex(ItemOID, 4));
+  
+  // Ожидание результата в системном сообщении
+  t0 := GetTickCount;
+  while (GetTickCount - t0 < 3000) do begin
+    Act := Engine.WaitAction([laSysMsg], P1, P2, 3000);
+    if Act <> laSysMsg then
+  	  Continue;
+    MsgID := Cardinal(P1);
+	//Print('MsgID: '+inttostr(MsgID));
+	
+	if (MsgID = 53) or (MsgID = 62) or (MsgID = 63) or (MsgID = 64) or (MsgID = 65) then
+	  Break;
+  end;
+  if Act <> laSysMsg then
+  	Exit;
+  
+  Delay(500);
+  
+  EnchantStatsProcessResult(ItemOID, FromLvl);
+  
+  Result := true;
+end;
+
+function ItemCountByID(const AID: Integer): Integer;
+var
+  i: Integer; It: TL2Item;
+begin
+  Result := 0;
+
+  // Инвентарь персонажа
+  for i := 0 to Inventory.User.Count - 1 do begin
+	It := Inventory.User.Items(i);
+	if (It = nil) then Continue;
+	
+    if It.ID = AID then
+      Inc(Result, It.Count);
+  end;
+end;
+
+function CountByID_EnchantGE(const AID, MinEnchant: Integer): Integer;
+var
+  i: Integer; It: TL2Item;
+begin
+  Result := 0;
+  for i := 0 to Inventory.User.Count - 1 do begin
+    It := Inventory.User.Items(i);
+    if (It.ID = AID) and (It.EnchantLevel >= MinEnchant) then
+      Inc(Result, It.Count);
+  end;
+end;
+
+function CountByID_EnchantLT(const AID, MaxEnchant: Integer): Integer;
+var
+  i: Integer; It: TL2Item;
+begin
+  Result := 0;
+  for i := 0 to Inventory.User.Count - 1 do begin
+    It := Inventory.User.Items(i);
+    if (It.ID = AID) and (It.EnchantLevel < MaxEnchant) then
+      Inc(Result, It.Count);
+  end;
+end;
+
+// Statistics
+procedure EnchantStatsInit(const MaxEnchant: Integer);
+var
+  i: Integer;
+begin
+  Script.Lock;
+  try
+    gStatMaxLvl := MaxEnchant;
+    if gStatMaxLvl > STAT_CAP then
+      gStatMaxLvl := STAT_CAP;
+
+    for i := 0 to STAT_CAP do begin
+      gStatTries[i] := 0;
+      gStatOk[i] := 0;
+    end;
+  finally
+    Script.Unlock;
+  end;
+end;
+
+procedure EnchantStatsProcessResult(const ItemOID: Cardinal; const FromLvl: Integer);
+var
+  Obj: TL2Object; It: TL2Item; Success: Boolean; ToLvl: Integer;
+begin
+  Success := False;
+  ToLvl := FromLvl + 1;
+
+  Obj := nil;
+
+  if Inventory.User.ByOID(ItemOID, Obj) then begin
+    It := TL2Item(Obj);
+    if (It <> nil) and (It.EnchantLevel = ToLvl) then
+      Success := True;
+  end;
+
+  EnchantStatsAdd(ToLvl, Success);
+end;
+
+procedure EnchantStatsAdd(const ToLvl: Integer; const Success: Boolean);
+begin
+  if (ToLvl <= 0) then Exit;
+
+  Script.Lock;
+  try
+    if (ToLvl > gStatMaxLvl) then Exit;
+	if (ToLvl > STAT_CAP) then Exit;
+	
+    Inc(gStatTries[ToLvl]);
+    if Success then
+      Inc(gStatOk[ToLvl]);
+  finally
+    Script.Unlock;
+  end;
+end;
+
+procedure EnchantStatsPrint;
+var
+  i, t, s: Integer;
+  p: Double;
+begin
+  Script.Lock;
+  try
+    Print('=== Enchant stats ===');
+    Print('ToLvl'#9'Tries'#9'Success'#9'Success_%');
+
+    for i := 1 to gStatMaxLvl do begin
+      t := gStatTries[i];
+      s := gStatOk[i];
+      if t > 0 then p := (s * 100.0) / t else p := 0.0;
+
+      // табы — чтобы удобно вставлялось в Excel, но кривой вывод в консоли
+      Print(IntToStr(i) + #9 + IntToStr(t) + #9 + IntToStr(s) + #9 + FormatFloat('0.00', p));
+    end;
+  finally
+    Script.Unlock;
+  end;
+end;
+
+// Preprocessing
+function GetScrollID(const Grade: Cardinal; const ItemType: Cardinal; const UseBlessed: Boolean): Integer;
+begin
+  Result := 0;
+
+  if UseBlessed then begin
+    case Grade of
+      2: begin
+           if IsWeaponItemType(ItemType) then Result := 6573 // C-оружие (blessed)
+           else Result := 6574; // C-броня (blessed)
+         end;
+      3: begin
+           if IsWeaponItemType(ItemType) then Result := 6571 // B-оружие (blessed)
+           else Result := 6572; // B-броня (blessed)
+         end;
+      4: begin
+           if IsWeaponItemType(ItemType) then Result := 6569 // A-оружие (blessed)
+           else Result := 6570; // A-броня (blessed)
+         end;
+      5: begin
+           if IsWeaponItemType(ItemType) then Result := 6577 // S-оружие (blessed)
+           else Result := 6578; // S-броня (blessed)
+         end;
+    end;
+  end
+  else begin
+    case Grade of
+      2: begin
+           if IsWeaponItemType(ItemType) then Result := 951 // C-оружие (обычные)
+           else Result := 952; // C-броня (обычные)
+         end;
+      3: begin
+           if IsWeaponItemType(ItemType) then Result := 947 // B-оружие (обычные)
+           else Result := 948; // B-броня (обычные)
+         end;
+      4: begin
+           if IsWeaponItemType(ItemType) then Result := 729 // A-оружие (обычные)
+           else Result := 730; // A-броня (обычные)
+         end;
+      5: begin
+           if IsWeaponItemType(ItemType) then Result := 959 // S-оружие (обычные)
+           else Result := 960; // S-броня (обычные)
+         end;
+    end;
+  end;
+end;
+
+function IsWeaponItemType(const ItemType: Cardinal): Boolean;
+begin
+  // TL2Item.ItemType: 0 - оружие, 1 - броня, 2 - бижутерия...
+  Result := (ItemType = 0);
+end;
+
+procedure EnchantingExecutionThread();
+var
+  ItemID, MaxEnchant, MinItemCount: Integer; UseBlessed: Boolean;
+begin
+  Script.Lock;
+  try
+	ItemID := gItemID;
+	MaxEnchant := gMaxEnchant;
+	MinItemCount := gMinItemCount;
+	UseBlessed := gUseBlessed;
+  finally
+	Script.Unlock;
+  end;
+  
+  EnchantingExecution(ItemID, MaxEnchant, MinItemCount, UseBlessed);
+end;
+
+begin
+  Engine.SetPerform(1);
+  EnchantingGUI;
+end.

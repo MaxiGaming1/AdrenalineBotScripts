@@ -1,0 +1,3754 @@
+Uses SysUtils, RegExpr;
+
+type
+	TStringArray = array of string;
+const
+	Path = 'E:\Games\Lineage\Bot\Scripts\';
+	PLs: array of string = ['Garosh', 'Xeil', 'Asgar', 'Drill'];
+	RaidBosses: array of string = ['Антарас', 'Валакас', 'Баюм', 'Квин Ант', 'Anakazel', 'Ember'];
+	TG_API_Key = '27d9d945998a637bf763a26ade783f2d';
+	NoExchangeFunCoin: array of string = ['Max', 'L2TopTrader', 'Erf', 'Ragn']; // Не менять адену на Fun coin
+	Prophet = 'Sarr'; BD = 'Dave'; SWS = 'Lycor';
+	Bishop = 'Yume'; Spoiler = 'Drill';
+	AltB_TP = true;	AltB_Buff = false;
+	// Items
+	Spear = 6601; // 6601 - Saint spear, переделать под динамическое вычисление пики
+	THSword = 6607; // 6607 - ХД, 6347 - С гр, 4725 - B гр
+	FunCoin = 6673;
+	DestroyArray: array of integer = [2919,4099,4083,4082,4087,4085,4091,4056,4065,6343,6345,4089,4088,4116,4120,3035,1925,8330,4119,4155,5161,4117,3956,4078,5156,5281,4084,4086,4118,4057,2024,2155,2028,4071,4069,4114,2099,2098,4110,4106,4154,4064,4131,4115,4113,4109,4052,4054,4053,8336,1900,1061,2011,5273,4077,1940,2154,1943,1939,1942,1938,1941,2918,2161,1952,2164,3002,6037,2074,2993,2163,2228,2122,2114,734,114,255,876,1896,1799,1793,50,6035,2176,1928,1926,1148,38,32,2053,6036,1833,907,1803,2184,1123,605,2023,2153,4130,4157,4080,4121,5460,4070,1832,1898,2113,2106,2107,4081,4090,4111,4096,4133,1920,2917,2115,1918,2097,5530,2970,1989,1988,2956,1981,2121,2231,2118,4950,4105,2233,5531,34,2110,4097,4944,4073,4100,4127,4098,3034,1977,4102,4439,4072,4101,1830,2404,2189,2217,4159,4160,5230,4084,5272,5220,5167,5162,1808,5277,3957,8487,3036,5282,6901,8954,8955,8956,8787,5556,5557,5558,5559,2972,436,5472,2975,2980,2270,2984,1825,2193,2990,2044,2162,2994,2971,2158,5473,2989,2936,2215,2051,2040,2194,2945,2048,2199,2058,1964,6668,2032,2205,2038,469,296,293,2288,395,416,436,1914,909,4126,2232,1915,2169,2117,4128,2112,2954,2955,4147,2961,4146,4145,2963,4142,4143,5157,5271
+	,8723,8724,8725,8726,8727,8728,8729,8730,8731,8732,8733,8734,8735,8736,8737,8738,8739,8740,8741,8742,8743,8744,8745,8746,8747,8748,8749,8750,8751,8753,8754,8755,8756,8757,8758,8759,8760,8761 // LS
+	,5478,5479,5480,5481,5482,5483,5484,5487,5488,5490,5491,5492,5493,5494,5495,5502,5503,5515,5523,5528,5514,5522,5527,5520,5524,5529,5532,5533,5534,5535,5536,5537,5538,5539,5540,5541,5542,5543,5544,5545,5547,5548,6341,6343,6345,8331,8341,8342,8346,8349 // A Grade Key Material
+	,5298,5297,150,5287,5301,5288,5320,164,6342,6344,6346 // A Grade
+	];
+	SKeys: array of Integer = [6688,6689,6690,6691,6692,6693,6694,6695,6696,6697,6698,6699,6700,6701,6702,6703,6704,6705,6706,6707,6708,6709,6710,6711,6712,6713,6714,6698,6699,6700 // S Key Material
+	,729,730,959,960,6570,6577,6578 // Заточки
+	,FunCoin,5908,5911,5914,8762,5965 // Fun coin, SA 13, Top LS, Blank Scroll
+	];
+	Materials: array of Integer = [1864,1865,1866,1867,1868,1869,1870,1871,1872,1873,1874,1875,1876,1877,1878,1879,1880,1881,1882,1883,1884,1885,1886,1887,1888,1889,1890,1891,1892,1893,1894,1895,4039,4040,4041,4042,4043,4044,4045,4046,4047,4048,5549,5550,5551,5552,5553,5554
+	,6342,6344,6346,5509,5485,5546,5508,5521,5496,5497,5526,5525,1461 // A-Grade Keys
+	,1462,6847,6849,6851,6899 // S-Grade Recipes
+	];
+
+var
+	PL, CurrentClass, CurrentClassType, FarmTarget: string;
+	Initial: boolean;
+	CharacterIsBusy, SuccessfulSpoil: boolean;
+	ChatQ_Sender, ChatQ_Text: array of string; ChatQ_Type: array of Integer; ChatThreadRunning: boolean;
+	AliveRB: TStringArray;
+	CombatThreadEnabled, CombatThreadRunning: boolean; CombatPurpose: string;
+	TargetSearchThreadEnabled, TargetSearchThreadRunning: boolean;
+	AttackThreadEnabled, AttackThreadRunning: boolean;
+	StakatoThreadEnabled, StakatoThreadRunning: boolean;
+	DisNecrThreadEnabled, DisNecrThreadRunning: boolean;
+	DestroComboThreadEnabled, DestroComboThreadRunning, DestroWeaponChangeThreadEnabled: boolean;
+
+// Основная процедура
+procedure MainThread();
+var
+	t0: Cardinal;
+	_Initial, InitializeCombat: boolean;
+	_FarmTarget: string;
+	R: TRegExpr; TargetLvl: integer;
+	Adena: TL2Item;
+begin
+	InitializeCombat := false;
+	
+	try // try except для отладки
+	
+	while Delay(5000) do begin
+		
+		// Ingame check
+		if Engine.Status <> lsOnline then begin
+			if (not GetGlobalBoolVar(Initial)) then begin
+				Print('Персонаж офлайн');
+				SetGlobalBoolVar(Initial, true);
+			end;
+			Continue;
+		end;
+		
+		// Инициализация
+		_Initial := GetGlobalBoolVar(Initial);
+		if _Initial then begin
+			Init();
+			InitializeCombat := true;
+		end;
+		
+		_FarmTarget := GetGlobalStrVar(FarmTarget);
+		
+		// Группой управляет лидер, для остальных - Continue
+		if (Contains(_FarmTarget, 'Raid') or Contains(_FarmTarget, 'Party')) then begin
+			if (Party.Chars.Count = 0) then Continue;
+			if not PartyLeaderBugFix() then Continue;
+		end;
+		
+		// Обработка смерти персонажа
+		if User.Dead then begin
+			
+			if Contains(_FarmTarget, 'Deleveling') then begin
+				
+				ResToTown();
+				InitializeCombat := true;
+				
+			end else begin
+				
+				Print('Сдох!');
+				
+				if (Party.Chars.Count = 0) then begin
+					
+					// Соло
+					if not StopFarmThreads() then Continue;
+					StopCombat();
+					ResToTown();
+					InitializeCombat := true;
+				
+				end else if (not PartyHasAliveMembers) and (Party.Leader.OID = User.OID) then begin
+				
+					// Сдохла вся пати
+					if not PartyExecuteEntry('StopCombat') then Continue;
+					if not PartyExecuteEntry('ResToTown') then Continue;
+					
+					if not StopFarmThreads() then Continue;
+					StopCombat();
+					ResToTown();
+					InitializeCombat := true;
+				
+				end else begin
+				
+					Print('MainThread. User.Dead. Ошибка!');
+					Continue;
+					
+				end;
+			end;
+		end;
+		
+		// Бафф
+		if NeedRebuff(_Initial, _FarmTarget) or PartyExecuteEntry('NeedRebuff') then begin
+			
+			// Остановить combat
+			if not StopFarmThreads() then Continue;
+			StopCombat();
+			
+			if (Engine.GetZoneType <> ztPeace) then begin
+				Print('Подготовка к ребафу');
+				if not ExitFightIfNeeded(120000) then Continue;
+			end;
+			
+			Engine.CancelTarget;
+			Engine.SetTarget(User);
+			
+			// SOE/TP Heine
+			if WaitOutOfCombat(60000) and PartyExecuteEntry('WaitOutOfCombat') then begin
+				if not AltB_Buff then begin
+					// Переделать. Проблема: кто-то в пати может улететь в город, а кто-то останется под мобами и сдохнет
+					if AltB_TP then begin
+						if not TP('TP Heine') or not PartyExecuteEntry('TP Heine') then Continue;
+					end else begin
+						if not TP('TP Unstuck') or not PartyExecuteEntry('TP Unstuck') then Continue;
+						// Сделать проход к Бафферу через GPS в случае необходимости
+					end;
+					
+					InitializeCombat := true;
+				end;
+			end;
+			
+			// Баф
+			if not GMBuff() or not PartyExecuteEntry('GMBuff') then begin
+				Print('GMBuff timeout!');
+				Continue;
+			end;
+			if NeedRebuff(_Initial, _FarmTarget) or PartyExecuteEntry('NeedRebuff') then begin
+				Print('NeedRebuff '+_FarmTarget);
+				Continue;
+			end;
+			
+			// Обмен Adena на Fun Coin
+			if not IsInArray(User.Name, NoExchangeFunCoin) then begin
+				Inventory.User.ByID(57, Adena);
+				if (Adena.Count > 1100000000) then begin
+					RunCBSequence(['_bbshome', '1e'], false);
+					Delay(500);
+					Engine.NpcExchange(6673, ((Adena.Count-1000000000) div 10000000));
+				end;
+			end;
+			
+			InitializeCombat := true;
+			
+		end; // NeedBuff()
+		
+		if (_FarmTarget = 'StakatoNest') and not GetGlobalBoolVar(StakatoThreadRunning) then
+			InitializeCombat := true
+		else if (_FarmTarget = 'DisciplesNecropolis') and not GetGlobalBoolVar(DisNecrThreadRunning) then
+			InitializeCombat := true;
+		
+		if InitializeCombat then begin
+			
+			// Определяем: куда мы идем, где мы, как идем
+			Print('InitializeCombat. FarmTarget: ' + _FarmTarget);
+			if Contains(_FarmTarget, 'Deleveling') then begin
+				R := TRegExpr.Create;
+				try
+					R.Expression := '^Deleveling ([0-9]+)$';
+					TargetLvl := 0;
+					if R.Exec(_FarmTarget) then
+						TargetLvl := StrToIntDef(R.Match[1], 0);
+					if (TargetLvl > 0) and (User.Level <= TargetLvl) then
+						Exit;
+				finally
+					R.Free;
+				end;
+				
+				Engine.FaceControl(1, false);
+				Deleveling();
+				Continue;
+			end
+			else if (_FarmTarget = 'DimensionalRift') then begin
+				
+				if (Engine.GetZoneType = ztPeace) then begin
+					if InDimensionalRift() and (User.Name = GetGlobalStrVar(PL)) then
+						DRFarm();
+				// TP();
+				// Баф кота
+				// Проход к фарм-зоне
+				// Фарм
+				end;
+				
+			end
+			else if (_FarmTarget = 'DinoStriders') then begin
+			
+				Engine.MoveTo(9357, -23737, -3736, 30000);
+				Engine.MoveTo(7550, -23174, -3639, 30000);
+				Engine.MoveTo(6970, -22893, -3568, 30000);
+				Engine.MoveTo(6989, -22461, -3408, 30000);
+				
+				StartCombat();
+				
+			end
+			else if (_FarmTarget = 'VarkaFarm') then begin
+			
+				if (not User.InZone) then begin
+					if not TP('TP Goddard') then Continue;
+					if not TP('TP Varka_Village') then Continue;
+					Delay(5000);
+					
+					Engine.MoveTo(109636, -54387, -2800, 120000);
+				end;
+				
+				StartCombat();
+				
+			end
+			else if (_FarmTarget = 'StakatoNest') then begin
+			
+				if GetGlobalBoolVar(StakatoThreadEnabled) then begin
+					SetGlobalBoolVar(StakatoThreadEnabled, False);
+					t0 := GetTickCount;
+					while GetGlobalBoolVar(StakatoThreadRunning) and (GetTickCount - t0 < 10000) do
+						Delay(500);
+				end;
+				
+				SetGlobalBoolVar(StakatoThreadEnabled, True);
+				Script.NewThread(@StakatoNestThread);
+			
+			end
+			else if (_FarmTarget = 'DisciplesNecropolis') then begin
+			
+				if GetGlobalBoolVar(DisNecrThreadEnabled) then begin
+					SetGlobalBoolVar(DisNecrThreadEnabled, False);
+					t0 := GetTickCount;
+					while GetGlobalBoolVar(DisNecrThreadRunning) and (GetTickCount - t0 < 10000) do
+						Delay(500);
+				end;
+				
+				SetGlobalBoolVar(DisNecrThreadEnabled, True);
+				Script.NewThread(@DisciplesNecropolisThread);
+			
+			end
+			else if (_FarmTarget = 'FOGFarm') then begin
+				FOGFarm();
+			end
+			else if (_FarmTarget = 'TTRecipeQuest') then begin
+				TTRecipeQuest();
+				Continue;
+			end
+			else if (_FarmTarget = 'FreeFarm') then begin
+				
+				StartCombat();
+				
+			end
+			else if Contains(_FarmTarget, 'Raid') then begin
+				
+				if Contains(_FarmTarget, 'Longhorn Golkonda') then begin
+					
+					//
+					
+				end//if not MoveToEx(90414, -44037, -2128, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Continue; end;
+				else if Contains(_FarmTarget, 'DimensionalRift70') then begin
+					
+					if (GetGlobalStrVar(PL) = User.Name) then begin
+						// Собрать пати, если персонаж - пати лидер
+						// Ищем среди подключенных ботов первого попавшегося с профессией Bishop (User.ClassID = 16) or (User.ClassID = 97) и Spoiler (User.ClassID = 55) or (User.ClassID = 117)
+						// Проверяем, что оба онлайн, если не онлайн, то пишем сообщение в телеграм
+						// 
+					end else begin
+						// Если персонаж в пати
+					end;
+					// Понять, где мы
+					// Передвижение
+					// Комбат
+					
+				end
+				else if Contains(_FarmTarget, 'DimensionalRift80') then begin
+					
+					if (GetGlobalStrVar(PL) = User.Name) then begin
+						// Собрать пати, если персонаж - пати лидер
+						// Ищем среди подключенных ботов первого попавшегося с профессией Bishop (User.ClassID = 16) or (User.ClassID = 97) и Spoiler (User.ClassID = 55) or (User.ClassID = 117)
+						// Проверяем, что оба онлайн, если не онлайн, то пишем сообщение в телеграм
+						// 
+					end else begin
+						// Если персонаж в пати
+					end;
+					// Понять, где мы
+					// Передвижение
+					// Комбат
+					
+				end
+				else if Contains(_FarmTarget, 'AQ') then begin
+					
+					if not AQ() then Continue;
+					
+				end
+				else if Contains(_FarmTarget, 'Baium') then begin
+					
+					//if not AQ() then Continue;
+					
+				end
+				else begin
+					StartCombat();
+					PartyExecuteEntry('StartCombat');
+				end;
+				
+			end
+			else if Contains(_FarmTarget, 'Party') then begin
+				
+				if not PartyLeaderBugFix() then Continue;
+				
+				if Contains(_FarmTarget, 'FOGFarm') then begin
+					if not FOGFarm() then Continue;
+				end
+				else begin
+					Print('Неизвестная настройка: '+_FarmTarget);
+					StartCombat();
+					PartyExecuteEntry('StartCombat');
+				end;
+			end
+			else begin
+			
+				StartCombat();
+				
+			end;
+			
+			InitializeCombat := false;
+			
+		end;
+	end;
+	
+	except
+		on E: Exception do begin
+			Print('!!! Exception MainThread: ' + E.Message);
+			Script.NewThread(@MainThread);
+		end;
+	end;
+end;
+
+Function NeedRebuff(_Initial: boolean; _FarmTarget: string): Boolean;
+var
+	Buff: TL2Buff;
+	Player: TL2Char;
+	_CurrentClassType, BuffCertificate: string;
+begin
+	_CurrentClassType := GetGlobalStrVar(CurrentClassType);
+	Result := false;
+	
+	if Contains(_FarmTarget, 'Deleveling') then
+		Exit;
+		
+	if User.InCombat and Contains(_FarmTarget, 'Raid') then
+		Exit;
+	
+	// Общее
+	User.Buffs.ByID(1040, Buff); // Shield
+	Result := (Buff = nil)
+		or ((Buff <> nil) and (Buff.Endtime < 300000))
+		or ((Buff <> nil) and ((Engine.GetZoneType = ztPeace) or _Initial) and (Buff.Endtime < 3600000));
+	if Result then Exit;
+	
+	User.Buffs.ByID(1035, Buff); // Mental Shield
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	User.Buffs.ByID(1036, Buff); // Magic Barrier
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	User.Buffs.ByID(1204, Buff); // WW
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	User.Buffs.ByID(268, Buff); // Song of Wind
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	User.Buffs.ByID(264, Buff); // Song of Earth
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	User.Buffs.ByID(267, Buff); // Song of Warding
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	User.Buffs.ByID(304, Buff); // Song of Vitality
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	User.Buffs.ByID(349, Buff); // Song of Renewal
+	Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+	if Result then Exit;
+	
+	if (GetGlobalStrVar(CurrentClass) <> 'Destroyer') then begin // У дестра свой БТБ
+		User.Buffs.ByID(1045, Buff); // BTB
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+	end;
+	
+	// Только для воинов
+	if (_CurrentClassType = 'WarriorClass') then begin
+		User.Buffs.ByID(1068, Buff); // Might
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1077, Buff); // Focus
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1086, Buff); // Haste
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1242, Buff); // Death Whisper
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1062, Buff); // Bers
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(269, Buff); // Song of Hunter
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(310, Buff); // Dance of Vampire
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(271, Buff); // Dance of Warrior
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(274, Buff); // Dance of Fire
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(275, Buff); // Dance of Fury
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+	end;
+	
+	// Только для кастеров
+	if (_CurrentClassType = 'MageClass') then begin
+		User.Buffs.ByID(1085, Buff); // Acumen
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1078, Buff); // Concentration
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1062, Buff); // Bers
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1059, Buff); // Empower
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1303, Buff); // Wild Magic
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1389, Buff); // Greater Shield
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(273, Buff); // Dance of Mystic
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(276, Buff); // Dance of Concentration
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(365, Buff); // Dance of Siren
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		// Malaria
+		if UserHasItem(9143, BuffCertificate) then begin
+			User.Buffs.ByID(4554, Buff);
+			Result := ((Buff <> nil) and (Buff.Endtime < 1000)) or (Buff = nil);
+			if Result then Exit;
+		end;
+	end;
+
+	// Только для Танков
+	if (_CurrentClassType = 'TankClass') then begin
+		User.Buffs.ByID(1389, Buff); // Greater Shield
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(275, Buff); // Dance of Fury
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(364, Buff); // Champion Song
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1086, Buff); // Haste
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1087, Buff); // Agility
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1240, Buff); // Guidance
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+		
+		User.Buffs.ByID(1243, Buff); // Blessed Shield
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+	end;
+		
+	// Chant of Victory
+	if (_CurrentClassType = 'WarriorClass') or
+		(_CurrentClassType = 'TankClass') or
+		(_CurrentClassType = 'SummonerClass') or
+		(_CurrentClassType = 'SupportClass') or 
+		(_CurrentClassType = 'UnknownClass') then begin
+		
+		User.Buffs.ByID(1363, Buff); // Chant of Victory
+		Result := ((Buff <> nil) and (Buff.Endtime < 90000)) or (Buff = nil);
+		if Result then Exit;
+	end;
+	
+end;
+
+// Combat +
+procedure CombatThread();
+var
+	_CombatPurpose, _CurrentClass, _CurrentClassType, _FarmTarget: string;
+	ProcedureDelay: integer;
+	MobID: Cardinal;
+begin
+	
+	Print('CombatThread запущен');
+	ProcedureDelay := 100;
+	_FarmTarget := GetGlobalStrVar(FarmTarget);
+	_CombatPurpose := GetGlobalStrVar(CombatPurpose);
+	_CurrentClass := GetGlobalStrVar(CurrentClass); 
+	_CurrentClassType := GetGlobalStrVar(CurrentClassType); 
+	
+	if (Engine.Status <> lsOnline) then begin
+		Print('CombatThread остановлен. Offline');
+		SetGlobalBoolVar(CombatThreadEnabled, false);
+		SetGlobalBoolVar(CombatThreadRunning, false);
+		Exit;
+	end;
+	
+	if GetGlobalBoolVar(CombatThreadRunning) then
+		Exit
+	else
+		SetGlobalBoolVar(CombatThreadRunning, true);
+	
+	While Delay(ProcedureDelay) do begin
+	
+		if (Engine.Status <> lsOnline) or not GetGlobalBoolVar(CombatThreadEnabled) then begin
+			SetGlobalBoolVar(CombatThreadRunning, false);
+			Print('CombatThread остановлен');
+			Exit;
+		end;
+		
+		if (_CombatPurpose = 'ExitFight') then begin
+			// Ищем цель. Переделать, поиск цели и атака в 2 треда, кроме бишопа
+			MobID := GetLowestHPMob(true, _FarmTarget);
+			if (MobID = 0) then begin
+				ProcedureDelay := 300;
+				Continue;
+			end else begin
+				// Атакуем по классу
+				ProcedureDelay := 100;
+				Engine.SetTarget(MobID);
+				
+				if (_CurrentClass = 'Destroyer') then begin
+					EquipItem(THSword);
+					Engine.Attack(100);
+				end else if (_CurrentClass = 'SpellHowler') then begin
+					if (User.HP < 80) then
+						Engine.UseSkill(1234); // Vampiric Claw
+					Engine.UseSkill(1341); // Wind Vortex
+					Engine.UseSkill(1239); // Hurricane
+					Engine.UseSkill(1267); // Shadow Flare
+				end else if (_CurrentClassType = 'WarriorClass') then begin
+					Engine.Attack(100);
+				end else begin
+					Engine.Attack(100);
+				end;
+			end;
+		end;
+	end;
+end;
+
+procedure TargetSearchThread();
+begin
+end;
+
+procedure AttackThread();
+begin
+end;
+
+function ExitFightIfNeeded(const TimeoutMs: Cardinal): Boolean;
+var
+	t0: Cardinal;
+begin
+	Result := False;
+
+	// Если агро нет — выходить не из чего
+	if not HaveAggroMobsIncludeSuspicious() and PartyExecuteEntry('HaveAggroMobsIncludeSuspicious') then begin
+		Result := True;
+		Exit;
+	end;
+
+	// Если уже мертвы — это точно не успех
+	if User.Dead then
+		Exit;
+	
+	StartCombat('ExitFight');
+	
+	t0 := GetTickCount;
+	try
+		while HaveAggroMobsIncludeSuspicious() and (not User.Dead) and (GetTickCount - t0 < TimeoutMs) do
+			Delay(500);
+	finally
+		StopCombat();
+	end;
+
+	Result := (not User.Dead) and (not HaveAggroMobsIncludeSuspicious());
+end;
+
+procedure StartCombat(_CombatPurpose: string = '');
+var
+	t0, TimeoutMs: Cardinal;
+begin
+	if (_CombatPurpose = 'ExitFight') then begin
+	
+		TimeoutMs := 10000;
+		// Если боевой тред уже включён, то выключаем
+		if GetGlobalBoolVar(CombatThreadEnabled) then begin
+			SetGlobalBoolVar(CombatThreadEnabled, False);
+			t0 := GetTickCount;
+			while GetGlobalBoolVar(CombatThreadRunning) and (GetTickCount - t0 < TimeoutMs) do
+				Delay(500);
+		end;
+
+		// Запускаем ExitFight
+		Print('ExitFight');
+		SetGlobalStrVar(CombatPurpose, 'ExitFight');
+		SetGlobalBoolVar(CombatThreadEnabled, True);
+		Script.NewThread(@CombatThread);
+		
+	end
+	else begin
+	
+		Engine.FaceControl(1, true);
+		if (GetGlobalStrVar(CurrentClass) = 'Destroyer') then begin
+			SetGlobalBoolVar(DestroComboThreadEnabled, true);
+			Script.NewThread(@DestroComboThread);
+		end;
+		
+	end;
+end;
+
+procedure StopCombat();
+var
+	Aura: TL2Buff;
+begin
+	SetGlobalBoolVar(CombatThreadEnabled, false);
+	SetGlobalBoolVar(DestroComboThreadEnabled, false);
+	Engine.FaceControl(1, false);
+	
+	if User.Buffs.ByID(337, Aura) then
+		Engine.UseSkill(337);
+end;
+
+function StopFarmThreads(): Boolean;
+var
+	t0, TimeoutMs: Cardinal;
+begin
+	Result := False;
+	TimeoutMs := 120000;
+	
+	// Stakato Nest
+	t0 := GetTickCount;
+	SetGlobalBoolVar(StakatoThreadEnabled, false);
+	while GetGlobalBoolVar(StakatoThreadRunning) and (GetTickCount - t0 < TimeoutMs) do
+		Delay(500);
+	if GetGlobalBoolVar(StakatoThreadRunning) then
+		Exit;
+	
+	// Disciple's Necropolis
+	t0 := GetTickCount;
+	SetGlobalBoolVar(DisNecrThreadEnabled, false);
+	while GetGlobalBoolVar(DisNecrThreadRunning) and (GetTickCount - t0 < TimeoutMs) do
+		Delay(500);
+	if GetGlobalBoolVar(DisNecrThreadRunning) then
+		Exit;
+	
+	Result := True;
+end;
+// Combat -
+
+// Destroyer +
+procedure DestroComboThread();
+var
+	i, MainWeapon: integer;
+	FrenzySkillCD, FrenzyBuffEndTime, FrenzyWaitUntil: cardinal;
+	CurrentBuff, FrenzyBuff, SilenceBuff: TL2Buff;
+	Item: TL2Item;
+	Player: TL2Char;
+	FrenzySkill, EarthquakeSkill: TL2Skill;
+	t0: Cardinal; _FarmTarget: string;
+begin
+	Print('DestroComboThread запущен');
+	FrenzyWaitUntil := 0;
+	
+	// Проверяем, что это дестр
+	if (GetGlobalStrVar(CurrentClass) <> 'Destroyer') or (Engine.Status <> lsOnline) then begin
+		Print('DestroComboThread остановлен. Offline/Class');
+		SetGlobalBoolVar(DestroComboThreadEnabled, false);
+		SetGlobalBoolVar(DestroComboThreadRunning, false);
+		Exit;
+	end;
+	
+	if GetGlobalBoolVar(DestroComboThreadRunning) then begin
+		Print('Ошибка! Повторный запуск DestroComboThread.');
+		Exit;
+	end else
+		SetGlobalBoolVar(DestroComboThreadRunning, true);
+	
+	_FarmTarget := GetGlobalStrVar(FarmTarget);
+	
+	While Delay(1000) do begin
+		if (Engine.Status <> lsOnline) or (not GetGlobalBoolVar(DestroComboThreadEnabled)) then begin
+			Print('DestroComboThread остановлен');
+			SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, false);
+			SetGlobalBoolVar(DestroComboThreadRunning, false);
+			Exit;
+		end;
+		
+		User.Buffs.ByID(5081, SilenceBuff);
+		if ((FrenzyWaitUntil <> 0) and (not TickReached(FrenzyWaitUntil))) or (SilenceBuff <> nil) then
+			Continue
+		else
+			FrenzyWaitUntil := 0;
+		
+		// Если был ребаф, а френзи не закончился
+		if User.Buffs.ByID(176, FrenzyBuff) and (FrenzyBuff <> nil) and (FrenzyBuff.EndTime > 0) then begin
+			FrenzyWaitUntil := GetTickCount + Cardinal(FrenzyBuff.EndTime);
+			Continue;
+		end;
+		
+		// Останавливаем смену вепов
+		SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, false);
+		PartyExecuteEntry('StopCombat');
+		
+		// Запоминаем Мейн веп
+		MainWeapon := 0;
+		for i:= 0 to Inventory.User.Count-1 do begin
+			Item := TL2Item(Inventory.User.items(i));
+			if (Item <> nil) and Item.Equipped and (Item.ItemType = 0) then
+				MainWeapon := Item.Id;
+		end;
+		
+		// Ищем агромоба 20 секунд, чтобы бил персонажа
+		t0 := GetTickCount;
+		while Delay(250) do begin
+			if (not GetGlobalBoolVar(DestroComboThreadEnabled)) or (Engine.Status <> lsOnline) then begin
+				Print('DestroComboThread остановлен');
+				SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, false);
+				SetGlobalBoolVar(DestroComboThreadRunning, false);
+				Exit;
+			end;
+			
+			if (GetTickCount - t0 > 20000) then begin
+				Break;
+			end;
+				
+			if HaveAggroMobs() then begin
+				Engine.FaceControl(1, false);
+				Engine.CancelTarget;
+				Engine.SetTarget(User);
+				
+				{if (User.Target <> nil) and (User.Target.MaxHP < 300000) then begin
+					//UnequipItem(2392);
+					//UnequipItem(2382);
+					//UnequipItem(5780);
+					//UnequipItem(5768);
+					//UnequipItem(547);
+				end;}
+				
+				Break;
+			end;
+		end;
+		
+		// Подходим к бишу
+		if not Contains(_FarmTarget, 'Raid') and Party.Chars.ByName(Bishop, Player) then begin
+			Engine.DMoveTo(Player.X, Player.Y, Player.Z);
+			Delay(250);
+		end;
+		
+		// Сливаем 40% хп
+		EquipItem(6314); // Homunkulus's Sword - Conversion
+		EquipItem(MainWeapon);
+		
+		// Ждем 30% ХП, бафаем Зил, Френзи, Бетл рор, Рейдж
+		while Delay(250) do begin
+			if (User.HP > 40) or (not HaveAggroMobs()) then begin
+				EquipItem(Spear);
+				
+				if SkillList.ByID(347, EarthquakeSkill) and (EarthquakeSkill <> nil) then begin
+					if Engine.UseSkill(347) then begin
+						while (User.Cast.EndTime > 0) and (not User.Dead) do begin
+							Delay(200);
+						end;
+						Engine.CancelTarget;
+						Engine.SetTarget(User);
+					end;
+				end;
+			end;
+			if User.HP < 35 then begin
+				//EquipItem(2392); // Leather Armor of Doom
+				EquipItem(2382);
+				EquipItem(5780);
+				EquipItem(5768);
+				EquipItem(547);
+				EquipItem(4761); // Cursed Dagger
+			end;
+			if User.HP < 30 then begin
+				SelfBuff(420); // Зил
+				SelfBuff(176); // Френзи
+				FrenzySkillCD := GetSkillEndTimeAfterUpdate(176, 500);
+				SelfBuff(121); // Бетл рор
+				SelfBuff(94);  // Рейдж
+				Break;
+			end;
+		end;
+		
+		// Могли сдохнуть, пока включались
+		if (Engine.Status <> lsOnline) or (not GetGlobalBoolVar(DestroComboThreadEnabled)) then begin
+			Print('DestroComboThread остановлен');
+			SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, false);
+			SetGlobalBoolVar(DestroComboThreadRunning, false);
+			Exit;
+		end;
+		
+		EquipItem(MainWeapon); // берем обратно веп
+		Engine.FaceControl(1, true);
+		SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, true);
+		Script.NewThread(@DestroWeaponChangeThread);
+		PartyExecuteEntry('StartCombat');
+		
+		// Ищем френзи, ждем окончания
+		FrenzyBuffEndTime := 0;
+		
+		if User.Buffs.ByID(176, FrenzyBuff) and (FrenzyBuff <> nil) then
+			FrenzyBuffEndTime := FrenzyBuff.EndTime;
+			
+		if FrenzySkillCD > 5000 then
+			FrenzySkillCD := FrenzySkillCD - 2000
+		else
+			FrenzySkillCD := 0;
+		
+		print('FrenzyBuffEndTime: '+inttostr(FrenzyBuffEndTime)+'; FrenzySkillCD: '+inttostr(FrenzySkillCD));
+		if FrenzyBuffEndTime > FrenzySkillCD then
+			FrenzySkillCD := FrenzyBuffEndTime;
+			
+		if FrenzySkillCD > 0 then begin
+			FrenzyWaitUntil := GetTickCount + FrenzySkillCD;
+			Continue;
+		end;
+	end;
+end;
+
+procedure DestroWeaponChangeThread();
+var
+	_DestroWeaponChangeThreadEnabled: boolean;
+begin
+	Print('DestroWeaponChangeThread запущен');
+	while Delay(500) do begin
+		_DestroWeaponChangeThreadEnabled := GetGlobalBoolVar(DestroWeaponChangeThreadEnabled);
+		if (not _DestroWeaponChangeThreadEnabled) then begin
+			Print('DestroWeaponChangeThread остановлен');
+			Exit;
+		end;
+		DestroWeaponChange();
+	end;
+end;
+
+procedure DestroWeaponChange();
+var
+	CurrentBuff: TL2Buff;
+	Item: TL2Item;
+	i, MobQuantity: integer;
+	NPC: TL2Npc;
+begin
+	// Считаем количество мобов на персонаже
+	MobQuantity := 0;
+	for i:= 0 to NpcList.Count-1 do begin
+		NPC := NpcList.items(i);
+		if (IsAggr(NPC)) then begin
+			Inc(MobQuantity);
+		end;
+	end;
+	
+	// Если мобов < 3 тогда надеваем Меч
+	if (MobQuantity < 3) then
+		EquipItem(THSword)
+	else
+		EquipItem(Spear);
+end;
+// Destroyer -
+
+function WaitOutOfCombat(TimeoutMs: Cardinal): Boolean;
+var
+	t0: Cardinal;
+begin
+	Result := False;
+	
+	// Дубль проверки только ради того, чтобы не было лишнего сообщения в логе
+	if not User.InCombat then begin
+		Result := True;
+		Exit;
+	end;
+	
+	//Print('Выход из боя');
+	t0 := GetTickCount;
+	while (GetTickCount - t0 < TimeoutMs) do begin
+		
+		if not User.InCombat then begin
+			Result := True;
+			Exit;
+		end;
+		
+		Delay(500);
+		
+		if HaveAggroMobs() then
+			Exit;
+	end;
+end;
+
+function GMBuff(): Boolean;
+begin
+	Print('GMBuff');
+	Result := false;
+	
+	if AltB_Buff then begin
+		if WaitOutOfCombat(60000) then begin
+			if not RunCBSequence(['_bbshome', '11', '19'], true) then Exit;
+		end else
+			Exit;
+	end else begin
+		// Предварительно делаем Cancel, чтобы убрать Малярию
+		if not RunDialogSequence(['Баффер', '02']) then Exit;
+		Delay(500);
+		if not RunDialogSequence(['Баффер', '09']) then Exit;
+		Delay(500);
+	end;
+	
+	Result := true;
+end;
+
+function SubAcc_Login(var AccName: string): Boolean;
+var
+	Obj: TBot;
+	Cmd: string;
+begin
+	Result := False;
+	
+	if not BotList.ByName(AccName, Obj) then begin
+		Print('Не найден аккаунт в BotList: ' + AccName);
+		Exit;
+	end;
+
+	if (Obj.Control = nil) then begin
+		Print('SubAcc_Login: найден, но Obj.Control=nil: ' + AccName);
+		Exit;
+	end;
+  
+	Cmd := 'Login';
+	// Вызов OnEntry в скрипте другого бота
+	Obj.Control.Entry(Cmd);
+	
+	Result := True;
+end;
+
+procedure SOE();
+const
+	BSOE_ID = 1538; // Blessed Scroll of Escape
+	SOE_ID = 736; // Scroll of Escape
+var
+	ItemName: string;
+begin
+	Print('SOE');
+	Engine.FaceControl(1, false);
+
+	TP('TP Unstuck');
+	
+	{if UserHasItem(BSOE_ID, ItemName) then begin
+		if Engine.UseItem(BSOE_ID) then
+			Delay(1000);
+	end else begin
+		if Engine.Unstuck then begin
+			t0 := GetTickCount;
+			while (User.Cast.EndTime <> 0) and (GetTickCount - t0 < 20000) do Delay(500);
+		end;
+	end;}
+end;
+
+procedure ResToTown();
+begin
+	if (GetGlobalStrVar(CurrentClassType) = 'SummonerClass') then Exit;
+	
+	Print('ResToTown');
+	Engine.FaceControl(1, false);
+	Delay(1000);
+	Engine.GoHome();
+	Delay(5000);
+	Exit;
+end;
+
+// Farm +
+procedure DimensionalRiftFarm();
+var
+	_CurrentClass: string;
+begin
+	{Print('DimensionalRiftFarm запущен');
+	Engine.FaceControl(1, false);
+	// Доделать
+	_CurrentClass := GetGlobalStrVar(CurrentClass);
+	if ((_CurrentClass <> 'Destroyer') or (_CurrentClass <> 'Bishop')) and (Engine.Status <> lsOnline) then begin
+		Print('DimensionalRiftFarm остановлен. Offline/Class');
+		SetGlobalBoolVar(DinoTyrFarmEnabled, false); // Переделать под DimensionalRiftFarmEnabled DimensionalRiftFarmRunning
+		SetGlobalBoolVar(DinoTyrFarmRunning, false);
+		Exit;
+	end;
+	
+	While Delay(1000) do begin
+		if (Engine.Status <> lsOnline) or (not GetGlobalBoolVar(DinoTyrFarmEnabled)) then begin
+			Print('DimensionalRiftFarm остановлен');
+			SetGlobalBoolVar(DinoTyrFarmRunning, false);
+			Exit;
+		end;
+		
+		// Проверяем InZone
+		// Если тир есть - бафаемся, нападаем, как только заагрился - отходим в зону
+		// Иначе - сливаем хп пикой, держим <27%, вне боя
+		// Если СА 12 лвла - пишем в тг "поменять"
+		
+	end;
+	//SetGlobalBoolVar(DestroComboThreadEnabled, true);
+	//Engine.FaceControl(1, true);
+	//Script.NewThread(@DestroComboThread);}
+end;
+
+procedure DRFarm();
+var
+	i: integer;
+	E2: TL2Control;
+	player: TL2Char;
+	SA, BlueSA13, RedSA13, GreenSA13: TL2Item;
+begin
+	E2:= GetControl(Bishop);
+	if (User.InRange(-114790, -180576, -6736, 500)) then begin
+		Engine.FaceControl(1, false);
+		Engine.InviteParty(Bishop);
+		while (not Engine.GetCharList.ByName(Bishop, player)) do begin
+			Delay(1000);
+		end;
+		
+		// Кладем в ВХ СА 13 лвла, покупаем новый
+		SA := nil;
+		Inventory.User.ByID(5914, BlueSA13);
+		Inventory.User.ByID(5908, RedSA13);
+		Inventory.User.ByID(5911, GreenSA13);
+		if (BlueSA13 <> nil) then
+			SA := BlueSA13
+		else if (RedSA13 <> nil) then
+			SA := RedSA13
+		else if (GreenSA13 <> nil) then
+			SA := GreenSA13;
+		if (SA <> nil) then begin
+			Engine.MoveTo(-114568, -180824, -6736);
+			Engine.SetTarget('Randolf');
+			Engine.DlgOpen(1000);
+			Engine.DlgSel('Личное хранилище.');
+			Engine.DlgSel('Положить предмет (личное хранилище)');
+			Engine.LoadItems(true, [5582, 1]); // Доделать
+		end;
+		
+		// Подходим к баферу
+		Engine.MoveTo(-114792, -180360, -6736);
+		E2.MoveTo(-114792, -180360, -6736);
+		Delay(1000);
+		
+		// Ребаф себя
+		Engine.SetTarget('Buffer');
+		Engine.DlgOpen(1000);
+		Engine.DlgSel('Main');
+		Delay(1000);
+		
+		// Ребаф биша
+		E2.SetTarget('Buffer');
+		E2.DlgOpen(1000);
+		E2.DlgSel('Main');
+		Delay(1000);
+		
+		// Идем в ДР
+		Engine.MoveTo(-114600, -181352, -6736);
+		Engine.MoveTo(-114776, -182072, -6736);
+		Engine.SetTarget('Rift Post Hero');
+		Engine.DlgOpen(1000);
+		Engine.DlgSel('I want to go to the inner space of the rift.');
+		Delay(1000);
+		
+		// Включаем фарм
+		SetGlobalBoolVar(DestroComboThreadEnabled, true);
+		Engine.FaceControl(1, true);
+		Script.NewThread(@DestroComboThread);
+	end;
+	while (not User.InRange(-114790, -180576, -6736, 500)) do begin
+		Delay(1000);
+		if (User.Target.Name = 'Anakazel') and (User.Target.Dead) then begin
+			Delay(10000);
+			E2.Unstuck;
+			Engine.Unstuck;
+		end;
+	end;
+end;
+
+function InDimensionalRift(): Boolean;
+begin
+	Result := false;
+	if (User.X < -45032) and (User.Y < -112568) then
+		Result := true;
+end;
+
+procedure Deleveling();
+var
+	Mob: Cardinal;
+begin
+	if (Engine.GetZoneType = ztPeace) then begin
+		if not RunCBSequence(['_bbshome', '10', '10', '11b'], true) then Exit;
+	end;
+	Mob := GetNearestMob(false, 0);
+	Engine.SetTarget(Mob);
+	Delay(200);
+	Engine.Attack(100);
+end;
+
+procedure DinoTyrFarm();
+var
+	_CurrentClass: string;
+begin
+	{Print('DinoTyrFarm запущен');
+	_CurrentClass := GetGlobalStrVar(CurrentClass);
+	if ((_CurrentClass <> 'Destroyer') and (_CurrentClass <> 'Bishop')) and (Engine.Status <> lsOnline) then begin
+		Print('DinoTyrFarm остановлен. Offline/Class');
+		SetGlobalBoolVar(DinoTyrFarmEnabled, false);
+		SetGlobalBoolVar(DinoTyrFarmRunning, false);
+		Exit;
+	end;
+	
+	Engine.LoadZone(Path+'Zones\DinoTyrFarm.zmap');
+	// 22216 - Tyr
+		
+	While Delay(1000) do begin
+		if (Engine.Status <> lsOnline) or (not GetGlobalBoolVar(DinoTyrFarmEnabled)) then begin
+			Print('DinoTyrFarm остановлен');
+			SetGlobalBoolVar(DinoTyrFarmRunning, false);
+			Exit;
+		end;
+		
+		// Проверяем InZone
+		// Если тир есть - бафаемся, нападаем, как только заагрился - отходим в зону
+		// Иначе - сливаем хп пикой, держим <27%, вне боя
+		// Если СА 12 лвла - пишем в тг "поменять"
+		
+	end;
+	//SetGlobalBoolVar(DestroComboThreadEnabled, true);
+	//Engine.FaceControl(1, true);
+	//Script.NewThread(@DestroComboThread);}
+end;
+
+function FOGFarm(): Boolean;
+var
+	_FarmTarget, TempCmd, StuckReason: string;
+	NeedMovement: Boolean;
+	BotNames: TStringArray; i: Integer; Obj: TL2Object; Ch: TL2Char;
+begin
+	Result := false;
+	_FarmTarget := GetGlobalStrVar(FarmTarget);
+	
+	NeedMovement := true;
+	if Contains(_FarmTarget, 'Party') then begin
+		
+		if (Party.Chars.Count = 0) then begin
+			
+			// Сбор пати
+			if (User.Name = Spoiler) then begin
+				
+				// Drill+Taris = Spoiler+SH
+				Engine.InviteParty('Taris');
+				
+				// Ожидание Тариса в пати
+				for i := 1 to 30 do begin
+					if (Party.Chars.Count > 0) and IsInParty('Taris') then Break;
+					Delay(100);
+				end;
+				
+				// Контроль, что Тарис зашел в пати
+				if (Party.Chars.Count = 0) or (not IsInParty('Taris')) then
+					Exit;
+				
+			end
+			else
+				NeedMovement := false;
+		end;
+		
+		if (Party.Chars.Count > 0) then begin
+			if (Party.Leader.OID <> User.OID) then begin
+				// Не лидер пати
+				NeedMovement := false;
+			end
+			else begin
+				// Проверка на зону пати лидера
+				if User.InZone then begin
+					
+					// Если все боты из пати в радиусе 900, тогда NeedMovement := false;
+					BotNames := GetBotNicknames();
+					NeedMovement := false;
+					
+					for i := 0 to High(BotNames) do begin
+						if SameText(BotNames[i], User.Name) then Continue;
+						if not IsInParty(BotNames[i]) then Continue;
+						
+						if Party.Chars.ByName(BotNames[i], Obj) and (Obj <> nil) then begin
+							Ch := TL2Char(Obj);
+							if (Ch = nil) or (User.DistTo(Ch) > 900) then begin
+								NeedMovement := true;
+								Break;
+							end;
+						end
+						else
+							Exit;
+					end;
+					
+				end;
+			end;
+		end;
+		
+	end
+	else begin
+		// Соло
+		if User.InZone then
+			NeedMovement := false;
+	end;
+	
+	if NeedMovement then begin
+		if not TP('TP Goddard') or not PartyExecuteEntry('TP Goddard') then Exit;
+		if not TP('TP FOG_Lower') or not PartyExecuteEntry('TP FOG_Lower') then Exit;
+		PartyExecuteEntry('StartCombat');
+		
+		// Здоровая комната
+		if not MoveToEx(180395, -111179, -5832, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		if not MoveToEx(181169, -110644, -5836, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		if not MoveToEx(182061, -110399, -5832, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		if not MoveToEx(182711, -110117, -5832, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		if not MoveToEx(183661, -110169, -6080, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		if not MoveToEx(184053, -110934, -6063, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	end;
+	
+	StartCombat();
+	PartyExecuteEntry('StartCombat');
+	Result := true;
+end;
+
+procedure StakatoNestThread();
+var
+	Zone, CurrentZone, ZonePath, ZoneFile, StuckReason: string;
+begin
+
+	Print('StakatoNest запущен');
+	if (Engine.Status <> lsOnline) then begin
+		Print('StakatoNest остановлен. Offline');
+		SetGlobalBoolVar(StakatoThreadEnabled, false);
+		SetGlobalBoolVar(StakatoThreadRunning, false);
+		Exit;
+	end;
+	
+	if GetGlobalBoolVar(StakatoThreadRunning) then
+		Exit
+	else
+		SetGlobalBoolVar(StakatoThreadRunning, true);
+	
+	try
+		ZonePath := Path + 'Zones\Stakato\';
+		Zone := Engine.GetZoneName(User.X, User.Y, User.Z);
+		if not SameText(Zone, 'Stakato Nest') then begin
+			
+			StopCombat();
+			if not TP('TP Rune') then Exit;
+			if not RunDialogSequence(['Ilyana', '03', '01', '05']) then Exit;
+			Delay(5000);
+			
+			// Проход в 1
+			if not MoveToEx(90414, -44037, -2128, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(91580, -43109, -2528, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(92397, -43573, -2688, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(92317, -44495, -2872, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(91510, -44882, -3024, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(90545, -44613, -3309, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(89853, -43287, -3816, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(89307, -43067, -3963, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			CurrentZone := '1';
+			ZoneFile := ZonePath + CurrentZone + '.zmap';
+			if FileExists(ZoneFile) then
+				Engine.LoadZone(ZoneFile)
+			else begin
+				Print('Не найден файл зоны: '+ZoneFile);
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+			Delay(500);
+			
+			if not FarmCurrentZone() then begin
+				Print('FarmCurrentZone: False; Zone: '+CurrentZone);
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+			// Проход в 2
+			if not MoveToEx(86555, -43871, -4132, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(86069, -44045, -4104, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(85636, -44270, -4344, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(85517, -44828, -4456, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			CurrentZone := '2';
+			
+		end
+		else begin
+			
+			CurrentZone := DetectCurrentZone(ZonePath, ['1','2','3','4','5','6']);
+			if (CurrentZone = '') then begin
+				Print('DetectCurrentZone. Не найдена текущая зона');
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+		end;
+		
+		while Delay(1000) do begin
+		
+			if (Engine.Status <> lsOnline) or not GetGlobalBoolVar(StakatoThreadEnabled) then Exit;
+			
+			// Загрузка зоны
+			ZoneFile := ZonePath + CurrentZone + '.zmap';
+			if FileExists(ZoneFile) then begin
+				Engine.LoadZone(ZoneFile);
+				Delay(500);
+				if not Engine.InZone(User) then begin
+					Print('User not InZone');
+					StopCombat();
+					SOE();
+					Exit;
+				end;
+			end else begin
+				Print('Не найден файл зоны: '+ZoneFile);
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+			// Фарм зоны
+			if not FarmCurrentZone() then begin
+				Print('FarmCurrentZone: False; Zone: '+CurrentZone);
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+			// Трансфер в следующую зону
+			case CurrentZone of
+				'2': begin
+					// Проход в 3 (цикл)
+					if not MoveToEx(85508, -47646, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(85478, -47860, -4616, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(85449, -48819, -5056, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '3';
+				end;
+				
+				'3': begin
+					// Проход в 4
+					if not MoveToEx(85320, -51055, -5128, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(85101, -51569, -5127, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '4';
+				end;
+				
+				'4': begin
+					// Проход в 5
+					if not MoveToEx(85303, -54443, -5120, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(85345, -54787, -5104, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(85294, -55350, -5168, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(84326, -55718, -4920, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(83403, -55818, -4656, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(83004, -55686, -4632, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(82621, -54687, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '5';
+				end;
+				
+				'5': begin
+					// Проход в 6
+					if not MoveToEx(82515, -52615, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(82668, -51541, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(82771, -50489, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '6';
+				end;
+				
+				'6': begin
+					// Проход в 2
+					if not MoveToEx(83805, -48232, -4639, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(84041, -48021, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(84335, -47430, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '2';
+				end;
+			
+			else
+			
+				CurrentZone := '';
+				
+			end;
+		end;
+	finally
+		Print('StakatoNest остановлен');
+		SetGlobalBoolVar(StakatoThreadEnabled, false);
+		SetGlobalBoolVar(StakatoThreadRunning, false);
+	end;
+end;
+
+function AQ(): Boolean;
+var
+	TempCmd, StuckReason: string; t0: Cardinal;
+	NeedMovement: Boolean;
+	BotNames: TStringArray; i: Integer; Obj: TL2Object; Ch: TL2Char;
+begin
+	Result := false;
+	
+	// Сбор пати
+	if (Party.Chars.Count < 4) then begin
+		Print('Сбор пати');
+		
+		if IsInArray(User.Name, PLs) then begin
+			
+			t0 := GetTickCount;
+			while (Party.Chars.Count < 4) and (GetTickCount - t0 < 120000) do
+				Delay(1000);
+			
+		end
+		else
+			Exit;
+	end;
+	if (Party.Chars.Count < 4) then begin
+		Print('AQ. Ошибка сбора пати');
+		Exit;
+	end;
+	
+	if (Party.Leader.OID <> User.OID) or not IsInArray(User.Name, PLs) then
+		Exit;
+	
+	PartyLeaderBugFix();
+	Delay(500);
+	
+	if not GMBuff() or not PartyExecuteEntry('GMBuff') then Exit;
+	if not TP('TP AQ') or not PartyExecuteEntry('TP AQ') then Exit;
+	PartyExecuteEntry('StartCombat');
+	
+	Print('Movement AQ');
+	if not MoveToEx(-10038, 175386, -4152, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-10195, 174700, -4320, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-10848, 174206, -4576, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-11493, 174047, -4640, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-12074, 174182, -4864, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-12979, 175020, -5224, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-13108, 175440, -5224, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-13351, 175848, -5304, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-13903, 176114, -5304, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-14631, 176535, -5304, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-15625, 176926, -5304, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-16393, 177304, -5304, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-17152, 178394, -5304, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-17835, 178500, -5384, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18134, 178520, -5384, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18609, 178556, -5384, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18758, 178732, -5384, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18752, 179116, -5384, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18629, 179673, -5472, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18353, 180189, -5520, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18162, 180578, -5520, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18221, 181265, -5520, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-18232, 181428, -5520, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-19375, 182494, -5504, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-19455, 182658, -5496, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-19508, 182964, -5558, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-19457, 183397, -5600, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-19436, 183688, -5600, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-19626, 183920, -5600, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-20070, 183914, -5639, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-20596, 183757, -5720, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-20795, 183403, -5717, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-21011, 182982, -5720, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(-21168, 182630, -5720, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	
+	Engine.SetTarget(29001); // Target AQ
+	Delay(300);
+	
+	if (User.Target = nil) then begin
+		// AQ нет
+		
+		ExitFightIfNeeded(90000);
+		TempCmd := 'SetGlobalStrVar(FarmTarget,Raid)';
+		OnEntry(TempCmd);
+		ExitFightIfNeeded(90000);
+		TP('TP Unstuck');
+		PartyExecuteEntry('TP Unstuck');
+		Result := true;
+		Exit;
+	end;
+	
+	StartCombat();
+	PartyExecuteEntry('StartCombat');
+	
+	t0 := GetTickCount;
+	while (GetTickCount - t0 < 600000) do begin
+		Engine.SetTarget(29001);
+		Delay(200);
+		if (User.Target = nil) then
+			Break;
+		if User.Target.Dead then
+			Break;
+		Delay(300);
+	end;
+	
+	Delay(5000); // На подбор дропа, лучше переделать под поиск кольца на полу
+	
+	ExitFightIfNeeded(90000);
+	
+	TempCmd := 'SetGlobalStrVar(FarmTarget,Raid)';
+	OnEntry(TempCmd);
+	ExitFightIfNeeded(90000);
+	TP('TP Unstuck');
+	PartyExecuteEntry('TP Unstuck');
+	TP('TP Heine');
+	PartyExecuteEntry('TP Heine');
+	
+	Result := true;
+end;
+
+procedure TTRecipeQuest(const FarmEnria: Boolean = false);
+var
+	_CurrentClass, Zone, StuckReason: string;
+	R: TRegExpr;
+begin
+	Print('TTRecipeQuest запущен');
+	_CurrentClass := GetGlobalStrVar(CurrentClass);
+	if (Engine.Status <> lsOnline) and (_CurrentClass <> 'Spoiler') then begin
+		Print('TTRecipeQuest остановлен. Offline/Class');
+		Exit;
+	end;
+	
+	Engine.FaceControl(1, false);
+	
+	if not User.InRange(149551, -112666, -2064, 100, 300) then begin
+		if ExitFightIfNeeded(120000) then begin
+			RunCBSequence(['_bbshome', '10', '10', '119'], true);
+			Delay(5000);
+		end else begin
+			TP('TP Unstuck');
+			Exit;
+		end;
+		
+		// Если не в зоне
+		Zone := Engine.GetZoneName(User.X, User.Y, User.Z);
+		if not SameText(Zone, 'Hot Springs') then begin
+			TP('TP Unstuck');
+			Exit;
+		end;
+	end;
+	
+	if (Engine.QuestStatus(623) = 0) then begin
+		// Взять квест
+		if not MoveToEx(149551, -112666, -2064, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		Engine.SetTarget('Jeremy');
+		Delay(200);
+		Engine.DlgOpen(3000);
+		Delay(200);
+		
+		// Обход защиты
+		R := TRegExpr.Create;
+		try
+			R.Expression := 'Введите код:<br>([0-9]+)<br>';
+			
+			if R.Exec(Engine.DlgText) then
+				Engine.BypassToServer('00 '+Trim(R.Match[1]));
+		finally
+			R.Free;
+		end;
+		Delay(200);
+		
+		RunDialogSequence(['', '00', '02', '00']);
+	end;
+	
+	// Выполнение квеста
+	if not MoveToEx(149205, -112511, -2064, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(148980, -112704, -2080, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21318) then begin SOE(); Exit; end; // Антилопа 1 (Enchant Armor: Grade A)
+	
+	if FarmEnria then
+		if not SpoilAndKillMob(21320) then begin SOE(); Exit; end; // Йети (Enria)
+	
+	if not MoveToEx(148841, -113201, -2096, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21315) then begin SOE(); Exit; end; // Буйвол 1
+	
+	if FarmEnria then begin
+		if not MoveToEx(149159, -113778, -2032, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		if not SpoilAndKillMob(21320) then begin SOE(); Exit; end; // Йети (Enria)
+	end;
+	
+	if not MoveToEx(149414, -114015, -1976, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21318) then begin SOE(); Exit; end; // Антилопа 2 (Enchant Armor: Grade A)
+	if not MoveToEx(149414, -114015, -1976, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	
+	if not MoveToEx(149674, -113859, -2032, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(150299, -114450, -1848, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	
+	if not MoveToEx(151245, -114934, -1609, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21316) then begin SOE(); Exit; end; // Флава 1 (DMP)
+	
+	if not MoveToEx(152937, -115462, -1568, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	
+	if FarmEnria then begin
+		if not MoveToEx(153486, -115615, -1544, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+		if not SpoilAndKillMob(21323) then begin SOE(); Exit; end; // Медведь (Enria)
+	end;
+	
+	if not MoveToEx(153768, -115929, -1536, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not MoveToEx(154101, -116279, -1528, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21316) then begin SOE(); Exit; end; // Флава 2 (DMP)
+	if not MoveToEx(154101, -116279, -1528, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	
+	if not MoveToEx(154658, -116802, -1488, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21316) then begin SOE(); Exit; end; // Флава 3 (DMP)
+	
+	if not MoveToEx(155830, -118385, -1344, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21316) then begin SOE(); Exit; end; // Флава 4 (DMP)
+	if not SpoilAndKillMob(21316) then begin SOE(); Exit; end; // Флава 5 (DMP)
+	if not SpoilAndKillMob(21315) then begin SOE(); Exit; end; // Буйвол 2
+	if not SpoilAndKillMob(21315) then begin SOE(); Exit; end; // Буйвол 3
+	
+	if ExitFightIfNeeded(120000) then begin
+		RunCBSequence(['_bbshome', '10', '10', '119'], true);
+		Delay(3000);
+	end else begin
+		TP('TP Unstuck');
+		Exit;
+	end;
+	
+	if not MoveToEx(150258, -113179, -2112, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	if not SpoilAndKillMob(21318) then begin SOE(); Exit; end; // Антилопа 3 (Enchant Armor: Grade A)
+	//if not MoveToEx(150258, -113179, -2112, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	
+	// Сдаем квест
+	if not MoveToEx(149551, -112666, -2064, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+	Engine.SetTarget('Jeremy');
+	Delay(200);
+	Engine.DlgOpen(3000);
+	Delay(200);
+	
+	// Обход защиты
+	R := TRegExpr.Create;
+	try
+		R.Expression := 'Введите код:<br>([0-9]+)<br>';
+		
+		if R.Exec(Engine.DlgText) then
+			Engine.BypassToServer('00 '+Trim(R.Match[1]));
+	finally
+		R.Free;
+	end;
+	Delay(200);
+	
+	RunDialogSequence(['', '00', '00', '00']);
+	
+end;
+
+procedure DisciplesNecropolisThread();
+var
+	Zone, CurrentZone, ZonePath, ZoneFile, StuckReason: string;
+begin
+
+	Print('DisciplesNecropolis запущен');
+	if (Engine.Status <> lsOnline) then begin
+		Print('DisciplesNecropolis остановлен. Offline');
+		SetGlobalBoolVar(DisNecrThreadEnabled, false);
+		SetGlobalBoolVar(DisNecrThreadRunning, false);
+		Exit;
+	end;
+	
+	if GetGlobalBoolVar(DisNecrThreadRunning) then
+		Exit
+	else
+		SetGlobalBoolVar(DisNecrThreadRunning, true);
+	
+	try // try except для отладки
+	
+	try
+		ZonePath := Path + 'Zones\Disciples\';
+		Zone := Engine.GetZoneName(User.X, User.Y, User.Z);
+		if not SameText(Zone, 'The Disciple''s Necropolis') then begin
+			
+			StopCombat();
+			if not TP('TP DisciplesNecropolis') then Exit;
+			Delay(5000);
+			
+			// Проход в 1
+			if not MoveToEx(172648, -17213, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(172663, -16511, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(173173, -15877, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(173163, -15132, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(172644, -15136, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(172667, -12998, -4898, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(173476, -12984, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(173495, -12661, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(176248, -12676, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(176243, -13011, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(178334, -13014, -4898, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			if not MoveToEx(178351, -10814, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+			CurrentZone := '1';
+			
+		end
+		else begin
+			
+			CurrentZone := DetectCurrentZone(ZonePath, ['1','2','3','4','5']);
+			if (CurrentZone = '') then begin
+				Print('DetectCurrentZone. Не найдена текущая зона');
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+		end;
+		
+		while Delay(1000) do begin
+		
+			if (Engine.Status <> lsOnline) or not GetGlobalBoolVar(DisNecrThreadEnabled) then begin
+				SetGlobalBoolVar(DisNecrThreadRunning, false);
+				Print('DisciplesNecropolis остановлен');
+				Exit;
+			end;
+			
+			// Загрузка зоны
+			ZoneFile := ZonePath + CurrentZone + '.zmap';
+			if FileExists(ZoneFile) then begin
+				Engine.LoadZone(ZoneFile);
+				Delay(500);
+				if not Engine.InZone(User) then begin
+					Print('User not InZone');
+					StopCombat();
+					SOE();
+					Exit;
+				end;
+			end else begin
+				Print('Не найден файл зоны: '+ZoneFile);
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+			// Фарм зоны
+			if not FarmCurrentZone() then begin
+				Print('FarmCurrentZone: False; Zone: '+CurrentZone);
+				StopCombat();
+				SOE();
+				Exit;
+			end;
+			
+			// Трансфер в следующую зону
+			case CurrentZone of
+				'1': begin
+					// Проход в 2
+					if not MoveToEx(179384, -10017, -4898, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(179675, -10014, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '2';
+				end;
+				
+				'2': begin
+					// Проход в 3
+					if not MoveToEx(180993, -10514, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(182447, -10536, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(182443, -9339, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '3';
+				end;
+				
+				'3': begin
+					// Проход в 4
+					if not MoveToEx(182962, -8393, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(182959, -7790, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '4';
+				end;
+				
+				'4': begin
+					// Проход в 5
+					if not MoveToEx(182648, -7299, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(181812, -7293, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '5';
+				end;
+				
+				'5': begin
+					// Проход в 1
+					if not MoveToEx(180622, -7589, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(180613, -8716, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(179925, -8704, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(179906, -9052, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(178832, -9028, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					if not MoveToEx(178864, -9511, -4896, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Exit; end;
+					CurrentZone := '1';
+				end;
+				
+			else
+			
+				CurrentZone := '';
+				
+			end;
+		end;
+	finally
+		SetGlobalBoolVar(DisNecrThreadEnabled, false);
+		SetGlobalBoolVar(DisNecrThreadRunning, false);
+	end;
+	
+	except
+		on E: Exception do Print('!!! Exception DisciplesNecropolisThread: ' + E.Message);
+	end;
+end;
+// Farm -
+
+function PartyHasAliveMembers: Boolean;
+var
+  i: Integer;
+  P: TL2Char;
+begin
+  Result := False;
+
+  for i := 0 to Party.Chars.Count - 1 do begin
+    P := TL2Char(Party.Chars.Items(i));
+    if (P <> nil) and (not P.Dead) and (P.HP > 0) then begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+function UserHasItem(ItemID: integer; out ItemName: string): boolean;
+var
+	Obj: TL2Object;
+	Item: TL2Item;
+begin
+	// Использование: if UserHasItem(ItemID, ItemName) then
+	Result := False;
+	ItemName := '';
+	
+	Result := Inventory.User.ByID(ItemId, Obj);
+	if Result then begin
+		Item := TL2Item(Obj);
+		ItemName := Item.Name;
+	end else begin
+		Result := Inventory.Quest.ByID(ItemId, Obj);
+		if Result then begin
+			Item := TL2Item(Obj);
+			ItemName := Item.Name;
+		end;
+	end;
+end;
+
+function GetNearestMob(OnlyAggro: Boolean; MobID: Cardinal): Cardinal;
+var
+	i: Integer;
+	Mob: TL2Npc; Obj: TL2Object;
+	bestDist, DistToMob: Integer;
+	BotNames: TStringArray; SelectedBot: TBot; _FarmTarget: string; Enemy: TL2Live;
+begin
+	Result := 0;
+	bestDist := MaxInt;
+	
+	for i := 0 to NpcList.Count - 1 do begin
+		Mob := NpcList.Items(i);
+		
+		// Проверка, что это моб
+		if (Mob = nil) or (not Mob.Valid) or Mob.Dead or Mob.Invisible or Mob.IsPet or (not Mob.Attackable) or CharList.ByOID(Mob.OID, Obj) then
+			Continue;
+		
+		if (MobID <> 0) and (Mob.ID <> MobID) then
+			Continue;
+		
+		if OnlyAggro and (not IsAggr(Mob)) then
+			Continue;
+		
+		DistToMob := User.DistTo(Mob);
+		if (DistToMob < bestDist) then begin
+			bestDist := DistToMob;
+			Result := Mob.OID;
+		end;
+	end;
+end;
+
+function GetLowestHPMob(OnlyAggro: Boolean; _FarmTarget: string): Cardinal;
+var
+	i: Integer;
+	Mob: TL2Npc; Obj: TL2Object;
+	bestHP: Integer;
+	BotNames: TStringArray; SelectedBot: TBot; Enemy: TL2Live;
+begin
+	Result := 0;
+	bestHP := MaxInt;
+	
+	// Проверка пати
+	if (Contains(_FarmTarget, 'Raid') or Contains(_FarmTarget, 'Party')) and (Party.Chars.Count > 0) and (Party.Leader.OID = User.OID) then begin
+		BotNames := GetBotNicknames();
+		for i := 0 to High(BotNames) do begin
+			if (not SameText(BotNames[i], User.Name)) and IsInParty(BotNames[i]) and BotList.ByName(BotNames[i], SelectedBot) and (SelectedBot.Control <> nil) then begin
+				Enemy := nil;
+				if SelectedBot.Control.FindEnemy(Enemy, SelectedBot.Control.GetUser, 1100) and (Enemy <> nil) then begin
+					Result := Enemy.OID;
+					if NpcList.ByOID(Enemy.OID, Obj) then
+						Exit;
+				end;
+			end;
+		end;
+	end;
+	
+	for i := 0 to NpcList.Count - 1 do begin
+		Mob := NpcList.Items(i);
+		
+		// Проверка, что это моб
+		if (Mob = nil) or (not Mob.Valid) or Mob.Dead or Mob.Invisible or Mob.IsPet or (not Mob.Attackable) or CharList.ByOID(Mob.OID, Obj) then
+			Continue;
+			
+		if OnlyAggro and (not IsAggr(Mob)) then
+			Continue;
+		
+		if (Mob.HP < bestHP) then begin
+			bestHP := Mob.HP;
+			Result := Mob.OID;
+		end;
+	end;
+end;
+
+function HaveAggroMobsIncludeSuspicious(): Boolean;
+var
+	i, j, k, l: Integer;
+	NPC: TL2Npc;
+	SuspiciousBefore, SuspiciousAfter: array of Cardinal;
+	id: Cardinal;
+	_Initialization: Boolean;
+begin
+	Result:= false;
+	
+	if HaveAggroMobs() then begin
+		Result := true;
+		Exit;
+	end;
+	
+	// Проверяем всех мобов, которые двигаются в цикле
+	SetLength(SuspiciousBefore, 0);
+	_Initialization := true;
+	l := 0;
+	while User.InCombat and (not User.Dead) do begin
+		
+		if _Initialization then begin
+			
+			// Первая итерация / инициализация
+			for i := 0 to NpcList.Count - 1 do begin
+				
+				NPC := NpcList.items(i);
+				if (NPC = nil) or (not NPC.Valid) or NPC.Dead then
+					Continue;
+				
+				if IsAggr(NPC) then begin
+					Result := true;
+					Exit;
+				end;
+				
+				if NPC.Moved or (User.DistTo(NPC) <= 200) then begin
+					k := Length(SuspiciousBefore);
+					SetLength(SuspiciousBefore, k + 1);
+					SuspiciousBefore[k] := NPC.OID;
+				end;
+			end;
+			
+			_Initialization := false;
+		end;
+		
+		SetLength(SuspiciousAfter, 0);
+		for j := 0 to High(SuspiciousBefore) do begin
+			
+			id := SuspiciousBefore[j];
+			if NpcList.ByOID(id, NPC) then begin
+				
+				if IsAggr(NPC) then begin
+					Result := true;
+					Exit;
+				end;
+				
+				if NPC.Moved or (User.DistTo(NPC) <= 200) then begin
+					k := Length(SuspiciousAfter);
+					SetLength(SuspiciousAfter, k + 1);
+					SuspiciousAfter[k] := id;
+				end;
+			end;
+		end;
+		
+		if Length(SuspiciousAfter) = 0 then begin
+			_Initialization := true;
+			Continue;
+		end;
+		
+		SuspiciousBefore := SuspiciousAfter;
+		
+		if l=5 then begin
+			if HaveAggroMobs() then begin
+				Result := true;
+				Exit;
+			end;
+			l := 0;
+		end;
+		Inc(l);
+		
+		Delay(200);
+		
+	end;
+	
+	// Финальная проверка, что нас не бьют
+	if HaveAggroMobs() then begin
+		Result := true;
+		Exit;
+	end;
+	
+end;
+
+function HaveAggroMobs(): Boolean;
+var
+	i: Integer;
+	NPC: TL2Npc;
+begin
+	Result:= false;
+	
+	for i:= 0 to NpcList.Count-1 do begin
+		NPC := NpcList.items(i);
+		if IsAggr(NPC) and (User.DistTo(NPC) < 1100) then begin
+			Result:= true;
+			Exit;
+		end;
+	end;
+end;
+
+function IsAggr(Mob: TL2Npc): boolean;
+begin
+	Result := False;
+	
+	if (Mob = nil) or (not Mob.Valid) or Mob.Dead or Mob.Invisible or (not Mob.Attackable) then
+		Exit;
+		
+	if Mob.AtkOID = User.OID then begin
+		Result := True;
+		Exit;
+	end;
+end;
+
+// Teleport +
+function TP(const Target: string): boolean;
+var
+	Radius, t0: Cardinal; StuckReason: string;
+begin
+	// print(inttostr(User.X)+', '+inttostr(User.Y)+', '+inttostr(User.Z));
+	// print(Engine.CBText);
+	// print(Engine.DlgText);
+	
+	Result := false;
+	if (Engine.Status <> lsOnline) or User.Dead then Exit;
+	Print('Teleport: '+Target);
+	
+	Radius := 150;
+	if AltB_TP then begin
+	
+		if Contains(Target, 'TP Heine') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '1e'], 111409, 219364, -3540, Radius) then Exit;
+		end
+		else if Contains(Target, 'TP Rune') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '1c'], 43799, -47727, -793, Radius) then Exit;
+		end
+		else if Contains(Target, 'TP Goddard') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '1b'], 147928, -55273, -2729, Radius) then Exit;
+		end
+		else if Contains(Target, 'TP Aden') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '1a'], 146331, 25762, -2013, Radius) then Exit;
+		end
+		else if Contains(Target, 'TP Varka_Village') then begin
+			if not RunDialogSequence(['Tatiana', '04', '01', '02']) then Exit;
+		end
+		else if Contains(Target, 'TP FOG_Lower') then begin
+			if not RunDialogSequence(['Tatiana', '04', '01', '0b']) then Exit;
+		end
+		else if Contains(Target, 'TP TOI_13') then begin
+			if not MoveToEx(146682, 25801, -2008, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); Exit; end;
+			if not RunDialogSequence(['Elisa', '02', '01', '09']) then Exit;
+		end
+		else if Contains(Target, 'TP DisciplesNecropolis') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '12', '1c'], 172445, -17594, -4894, Radius) then Exit;
+		end
+		else if Contains(Target, 'TP AQ') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '10', '18', '1d'], -9954, 176111, -4157, Radius) then Exit;
+		end
+		else if Contains(Target, 'TP Unstuck') then begin
+			if Engine.Unstuck then begin
+				if (Engine.GetZoneType = ztPeace) then begin
+					Delay(15000);
+				end else begin
+					t0 := GetTickCount;
+					while (Engine.GetZoneType <> ztPeace) and (GetTickCount - t0 < 20000) do Delay(500);
+				end;
+			end;
+		end
+		else begin
+			Print('TP(). Не найден маршрут телепорта!');
+			Exit;
+		end;
+	end else begin
+		Engine.SetTarget('Global Gatekeeper'); // 'Global Gatekeeper'
+		Engine.DlgOpen(1000);
+	end;
+	Delay(3000);
+	
+	Result := true;
+end;
+
+function Execute_TP(const TpName: string; const CBSeq: TStringArray; const X, Y, Z, Radius: Integer): Boolean;
+var
+	t0: Cardinal;
+begin
+	Result := False;
+
+	// Уже на месте
+	if User.InRange(X, Y, Z, Radius) then begin
+		Result := True;
+		Exit;
+	end;
+
+	// Запускаем телепорт (community board sequence)
+	if not RunCBSequence(CBSeq, true) then Exit;
+
+	// Ждём прилёта до 30с
+	t0 := GetTickCount;
+	while (not User.InRange(X, Y, Z, Radius)) and (GetTickCount - t0 < 30000) do
+		Delay(250);
+
+	if not User.InRange(X, Y, Z, Radius) then begin
+		Print(TpName + ': таймаут 30с — персонаж не оказался в радиусе ' + IntToStr(Radius) + ' от точки прилёта.');
+		Exit;
+	end;
+
+	Delay(1000);
+	Result := True;
+end;
+// Teleport -
+
+// Summoner +
+procedure SummonParty();
+var
+  i: Integer;
+  _Char: TL2Char;
+  t0: Cardinal;
+begin
+	// Саммоним пати
+	i := 0;
+	while i < Party.Chars.Count do begin
+		
+		_Char := TL2Char(Party.Chars.Items(i));
+		
+		if _Char = nil then begin Inc(i); Continue; end;
+		if SameText(_Char.Name, User.Name) then begin Inc(i); Continue; end; // себя не саммоним
+		if _Char.Dead or (_Char.HP <= 0) then begin Inc(i); Continue; end; // мертвых не саммоним
+		if User.InRange(_Char.X, _Char.Y, _Char.Z, 900) then begin Inc(i); Continue; end; // если уже рядом — не тратим саммон
+		
+		if Engine.SetTarget(_Char) then Delay(150);
+		if Engine.UseSkill(1403) then begin
+			Print('Summon: '+_Char.Name);
+			
+			// ждём окончание каста
+			t0 := GetTickCount;
+			while (User.Cast.EndTime > 0) and (GetTickCount - t0 < 20000) do begin
+				if (_Char = nil) or _Char.Dead or (_Char.HP <= 0) then begin
+					Print('Summon FAILED 1. Char dead: ' + _Char.Name);
+					Inc(i);
+					Continue;
+				end;
+				Delay(500);
+			end;
+			
+			// ждём, что цель окажется рядом (признак, что присуммонилась)
+			t0 := GetTickCount;
+			while (not User.InRange(_Char.X, _Char.Y, _Char.Z, 200)) and (GetTickCount - t0 < 20000) do begin
+				if (_Char = nil) or _Char.Dead or (_Char.HP <= 0) then begin
+					Print('Summon FAILED 2. Char dead: ' + _Char.Name);
+					Inc(i);
+					Continue;
+				end;
+				Delay(500);
+			end;
+			
+			// Финальная проверка, можно оповещать PL о фейле
+			if (not User.InRange(_Char.X, _Char.Y, _Char.Z, 200)) then begin
+				Print('Summon FAILED 3: ' + _Char.Name);
+				Continue;
+			end;
+			
+			Delay(500);
+		end;
+		
+		Inc(i);
+		
+	end;
+	
+	// Вызываем кота/коня
+	Engine.UseSkill(1331);
+	Engine.UseSkill(1332);
+end;
+// Summoner -
+
+function GetSkillEndTimeAfterUpdate(SkillId: cardinal; TimeoutMs: cardinal): cardinal;
+var
+  t0, tUpd: cardinal;
+  S: TL2Skill;
+begin
+	Result := 0;
+
+	t0 := GetTickCount;
+	tUpd := 0;
+
+	while (GetTickCount - t0 < TimeoutMs) do begin
+		Engine.UpdateSkillList;
+		tUpd := GetTickCount;
+
+		if SkillList.ByID(SkillId, S) and (S <> nil) then begin
+			Result := S.EndTime;        // возвращаем хоть 0, хоть не 0
+			if Result <> 0 then Exit;   // если нужно именно “поймать” откат
+		end;
+
+		Delay(100);
+	end;
+end;
+
+procedure EquipItem(ItemId: integer);
+var
+	Item: TL2Item;
+	i: integer;
+	t0: Cardinal;
+begin
+	if (ItemId = 0) then Exit;
+	if not Inventory.User.ByID(ItemId, Item) then Exit;
+	if (Item = nil) or (Item.Equipped) then Exit;
+	
+	for i := 1 to 2 do begin
+		Engine.UseItem(ItemId);
+		t0 := GetTickCount;
+		while (GetTickCount - t0 < 1000) do begin
+			Inventory.User.ByID(ItemId, Item);
+			if (Item <> nil) and Item.Equipped then Exit;
+			Delay(100);
+		end;
+	end;
+end;
+
+procedure UnequipItem(ItemId: integer);
+var
+	Item: TL2Item;
+	i: integer;
+	t0: Cardinal;
+begin
+	if not Inventory.User.ByID(ItemId, Item) then Exit;
+	if (Item = nil) or (not Item.Equipped) then Exit;
+	
+	for i := 1 to 2 do begin
+		Engine.UseItem(ItemId);
+		t0 := GetTickCount;
+		while (GetTickCount - t0 < 1000) do begin
+			Inventory.User.ByID(ItemId, Item);
+			if (Item <> nil) and (not Item.Equipped) then Exit;
+			Delay(100);
+		end;
+	end;
+end;
+
+procedure SelfBuff(SkillId: integer);
+var
+	Buff: TL2Buff;
+	Skill: TL2Skill;
+	i: integer;
+begin
+	if (not SkillList.ByID(SkillId, Skill)) or (Skill=nil) then begin
+		print('SkillId: ' + inttostr(SkillId) + ' не найден у персонажа!');
+		Exit;
+	end;
+	
+	if (Skill.EndTime > 1000) then Exit;
+	Engine.UseSkill(SkillId);
+	while (User.Cast.EndTime > 0) and (not User.Dead) do begin
+		Delay(100);
+	end;
+	{i := 0;
+	while Delay(100) do begin
+		Engine.UseSkill(SkillId);
+		User.Buffs.ByID(SkillId, Buff);
+		if (Buff<>nil) then Break;
+		if (i=1) then Break;
+		Inc(i);
+	end;}
+end;
+
+// RB Monitor +
+function ParseAliveBosses(const Html: string; const RegExpression: string): TStringArray;
+var
+	R: TRegExpr;
+begin
+	SetLength(Result, 0);
+
+	R := TRegExpr.Create;
+	try
+		R.Expression := RegExpression;
+		
+		if R.Exec(Html) then
+			repeat
+				AddUnique(Result, Trim(R.Match[1]));
+			until not R.ExecNext;
+	finally
+		R.Free;
+	end;
+end;
+
+procedure AddUnique(var Arr: TStringArray; const S: string);
+var
+	i, n: Integer;
+begin
+	if S = '' then Exit;
+	for i := 0 to High(Arr) do
+		if SameText(Arr[i], S) then Exit;
+		
+	n := Length(Arr);
+	SetLength(Arr, n + 1);
+	Arr[n] := S;
+end;
+
+procedure UpdateAliveBosses(const NewAliveRB: TStringArray);
+var
+	OldAliveRB: TStringArray;
+	i: Integer;
+begin
+	// Для инициализации
+	if Length(AliveRB) = 0 then begin
+		AliveRB := NewAliveRB;
+		
+		for i := 0 to High(AliveRB) do begin
+			if IsInArrayTStringArray(AliveRB[i], RaidBosses) then begin
+				SendToTelegram(TG_API_Key, 'RB Alive (init): ' + AliveRB[i]);
+			end;
+		end;
+		
+		Exit;
+	end;
+	
+	// снять копию старого списка
+	OldAliveRB := AliveRB;
+
+	// новые живые (их раньше не было) -> print
+	for i := 0 to High(NewAliveRB) do
+		if (not IsInArrayTStringArray(NewAliveRB[i], OldAliveRB)) and IsInArrayTStringArray(NewAliveRB[i], RaidBosses) then
+			SendToTelegram(TG_API_Key, 'RB Respawn: ' + NewAliveRB[i]);
+
+	// обновить общий список
+	AliveRB := NewAliveRB;
+end;
+// RB Monitor -
+
+// Общие функции бота
+function MoveToEx(const X, Y, Z: integer; out Reason: string): boolean;
+var
+	Radius, TimeoutMs, dist, lastDist, tStart, stuck_count, t0, ZLimit: integer;
+	BotNames: TStringArray; i: integer; _FarmTarget: string; PartyMember: TL2Char;
+begin
+	//Применение: if not MoveToEx(90414, -44037, -2128, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); SOE(); Continue; end;
+	
+	Result := False;
+	Reason := 'Unknown';
+
+	try // try except для отладки
+	
+	// быстрые отказы
+	if (Engine.Status <> lsOnline) then begin Reason := 'Critical_Offline'; Exit; end;
+	if (User.Dead) then begin Reason := 'Critical_Dead'; Exit; end;
+
+	Radius := 100;
+	TimeoutMs := 300000; // глобальный таймаут 5 мин
+	dist := User.DistTo(X, Y, Z);
+	lastDist := dist;
+	tStart := GetTickCount;
+	stuck_count := 0;
+	ZLimit := Abs(User.Z - Z) + 500;
+	_FarmTarget := GetGlobalStrVar(FarmTarget);
+
+	while Delay(200) do begin
+		if (not User.Moved) and (not User.Sitting) and (User.Cast.EndTime = 0)
+		and (Engine.Status = lsOnline) and (not User.Dead) then
+			Engine.DMoveTo(X, Y, Z);
+	
+		// Критичные состояния
+		if (Engine.Status <> lsOnline) then begin Reason := 'Critical_Offline'; Exit; end;
+		if (User.Dead) then begin Reason := 'Critical_Dead'; Exit; end;
+
+		// Успех
+		if User.InRange(X, Y, Z, Radius, ZLimit) then begin
+			
+			// Ожидаем пати
+			if (Contains(_FarmTarget, 'Raid') or Contains(_FarmTarget, 'Party')) and (Party.Chars.Count > 0) and (Party.Leader.OID = User.OID) then begin
+				BotNames := GetBotNicknames();
+				for i := 0 to High(BotNames) do begin
+					
+					if SameText(BotNames[i], User.Name) or not IsInParty(BotNames[i]) then Continue;
+					
+					Party.Chars.ByName(BotNames[i], PartyMember);
+					t0 := GetTickCount;
+					while (GetTickCount - t0 < 30000) do begin
+						
+						// проверяем дистанцию до лидера
+						if (User.DistTo(PartyMember) < 200) or HaveAggroMobs() or PartyExecuteEntry('HaveAggroMobs') then
+							Break;
+							
+						// если пати распалась или лидер сменился — прекращаем ожидание
+						if (Party.Chars.Count = 0) or (Party.Leader.OID <> User.OID) then Break;
+						
+						Delay(500);
+					end;
+					
+					if HaveAggroMobs() or PartyExecuteEntry('HaveAggroMobs') then
+						Break;
+					
+				end;
+			end;
+			
+			if not HaveAggroMobs() and not PartyExecuteEntry('HaveAggroMobs') then begin
+				Reason := 'Ok';
+				Result := True;
+				Exit;
+			end;
+		end;
+		
+		// агро -> включаем боевку "на выход из боя"
+		if (HaveAggroMobs() or PartyExecuteEntry('HaveAggroMobs')) then begin
+			StartCombat('ExitFight');
+			
+			t0 := GetTickCount;
+			while (HaveAggroMobs() or PartyExecuteEntry('HaveAggroMobs')) and (not User.Dead) and (GetTickCount - t0 < TimeoutMs) do Delay(500);
+			
+			StopCombat();
+			
+			if (GetTickCount - t0 > TimeoutMs) then begin Reason := 'Critical_Timeout'; Exit; end;
+			
+			Continue;
+		end;
+		
+		// контроль застревания: если не приближаемся
+		dist := User.DistTo(X, Y, Z);
+		if (not HaveAggroMobs()) and (dist + 30 >= lastDist) then begin
+			Inc(stuck_count);
+			if (stuck_count = 50) then Engine.UseKey(27);
+			if (stuck_count = 100) then begin Reason := 'Critical_Stuck'; Exit; end;
+		end
+		else begin
+			stuck_count := 0;
+			lastDist := dist;
+		end;
+		
+		if (GetTickCount - tStart > TimeoutMs) then begin Reason := 'Critical_Timeout'; Exit; end;
+		if Abs(User.Z - Z) > ZLimit then begin Reason := 'Critical_ZLimit'; Exit; end;
+	end;
+	
+	except
+		on E: Exception do Print('!!! Exception MoveToEx: ' + E.Message);
+	end;
+end;
+
+function GetBotNicknames(): TStringArray;
+var
+	i, n: Integer;
+	B: TBot;
+	Name: string;
+begin
+	SetLength(Result, 0);
+	n := 0;
+
+	for i := 0 to BotList.Count - 1 do begin
+		B := TBot(BotList(i));
+		if B = nil then Continue;
+
+		Name := B.UserName;
+		if Name = '' then Continue;
+
+		if B.Control = nil then Continue;
+		if B.Control.Status <> lsOnline then Continue;
+
+		if IsInArrayTStringArray(Name, Result) then Continue;
+
+		SetLength(Result, n + 1);
+		Result[n] := Name;
+		Inc(n);
+	end;
+end;
+
+procedure GetClassData();
+var
+	_CurrentClass, _CurrentClassType: string;
+begin
+	// WarriorClass
+	if (User.ClassID = 46) or (User.ClassID = 113) then begin
+		_CurrentClass := 'Destroyer';
+		_CurrentClassType := 'WarriorClass';
+	end else if (User.ClassID = 48) or (User.ClassID = 114) then begin
+		_CurrentClass := 'Tyrant';
+		_CurrentClassType := 'WarriorClass';
+	end else if (User.ClassID = 55) or (User.ClassID = 117) then begin
+		_CurrentClass := 'Spoiler';
+		_CurrentClassType := 'WarriorClass';
+	end else if (User.ClassID = 57) or (User.ClassID = 118) then begin
+		_CurrentClass := 'Warsmith';
+		_CurrentClassType := 'WarriorClass';
+	end else if (User.ClassID = 8) or (User.ClassID = 93) then begin
+		_CurrentClass := 'TreasureHunter';
+		_CurrentClassType := 'WarriorClass';
+	
+	// MageClass
+	end else if (User.ClassID = 40) or (User.ClassID = 110) then begin
+		_CurrentClass := 'SpellHowler';
+		_CurrentClassType := 'MageClass';
+	end else if (User.ClassID = 12) or (User.ClassID = 94) then begin
+		_CurrentClass := 'Sorcerer';
+		_CurrentClassType := 'MageClass';
+	end else if (User.ClassID = 27) or (User.ClassID = 103) then begin
+		_CurrentClass := 'SpellSinger';
+		_CurrentClassType := 'MageClass';
+		
+	// TankClass
+	end else if (User.ClassID = 6) or (User.ClassID = 91) then begin
+		_CurrentClass := 'DarkAvenger';
+		_CurrentClassType := 'TankClass';
+		
+	// SummonerClass
+	end else if (User.ClassID = 14) or (User.ClassID = 96) then begin
+		_CurrentClass := 'Warlock';
+		_CurrentClassType := 'SummonerClass';
+	end else if (User.ClassID = 28) or (User.ClassID = 104) then begin
+		_CurrentClass := 'ElementalSummoner';
+		_CurrentClassType := 'SummonerClass';
+		
+	// SupportClass
+	end else if (User.ClassID = 16) or (User.ClassID = 97) then begin
+		_CurrentClass := 'Bishop';
+		_CurrentClassType := 'SupportClass';
+	end else if (User.ClassID = 52) or (User.ClassID = 116) then begin
+		_CurrentClass := 'Warcryer';
+		_CurrentClassType := 'SupportClass';
+	
+	// Unknown
+	end else begin
+		_CurrentClass := 'Unknown';
+		_CurrentClassType := 'UnknownClass';
+		Print('Unknown Class');
+	end;
+	
+	Script.Lock;
+	try
+		CurrentClass := _CurrentClass;
+		CurrentClassType := _CurrentClassType;
+	finally
+		Script.Unlock;
+	end;
+end;
+
+procedure LoadConfig();
+var
+	FileName, ZoneFile, _CurrentClass, _CurrentClassType, _FarmTarget: string;
+begin
+	_FarmTarget := GetGlobalStrVar(FarmTarget);
+	
+	// Deleveling
+	if Contains(_FarmTarget, 'Deleveling') then begin
+		FileName := Path+'Settings\Deleveling.xml';
+		if FileExists(FileName) then
+			Engine.LoadConfig(FileName);
+		Exit;
+	end;
+	
+	// Персональные настройки по никам
+	if (User.Name = 'Agis') then begin
+		FileName := Path+'Settings\SH_DR_61.xml';
+		if FileExists(FileName) then
+			Engine.LoadConfig(FileName);
+		Exit;
+	end else if (User.Name = 'Xeil') then begin
+		FileName := Path+'Settings\DarkAvenger_Tank_AQ.xml';
+		if FileExists(FileName) then
+			Engine.LoadConfig(FileName);
+		Exit;
+	end else if (User.Name = 'Liora') then begin
+		FileName := Path+'Settings\Bishop_AQ.xml';
+		if FileExists(FileName) then
+			Engine.LoadConfig(FileName);
+		Exit;
+	end;
+	
+	_CurrentClass := GetGlobalStrVar(CurrentClass); 
+	_CurrentClassType := GetGlobalStrVar(CurrentClassType); 
+	
+	// Destroyers
+	if (_CurrentClass = 'Destroyer') then begin
+		if (_FarmTarget = 'FOGFarm') then begin
+			FileName := Path+'Settings\Destroyers_Farm_LoadZone.xml';
+			ZoneFile := Path+'Zones\FOG_Lower.zmap';
+		end else
+			FileName := Path+'Settings\Destroyers_Farm.xml';
+	end;
+	
+	// Bishops
+	if (_CurrentClass = 'Bishop') then
+		FileName := Path+'Settings\Bishops.xml';
+	
+	// SH
+	if (_CurrentClass = 'SpellHowler') then begin
+		if (_FarmTarget = 'StakatoNest') or (_FarmTarget = 'DisciplesNecropolis') then begin
+			FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
+		end else if (_FarmTarget = 'VarkaFarm') then begin
+			FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
+			ZoneFile := Path+'Zones\Varka.zmap';
+		end else if (_FarmTarget = 'FOGFarm') then begin
+			FileName := Path+'Settings\SHs_Farm_LoadZone.xml';
+			ZoneFile := Path+'Zones\FOG_Lower.zmap';
+		end else if Contains(_FarmTarget, 'Raid') then begin
+			FileName := Path+'Settings\SHs_Raid.xml';
+		end else if Contains(_FarmTarget, 'Party') then begin
+			if Contains(_FarmTarget, 'FOGFarm') then begin
+				FileName := Path+'Settings\SHs_Party_Farm.xml';
+				ZoneFile := Path+'Zones\FOG_Lower.zmap';
+			end else
+				FileName := Path+'Settings\SHs_Party_Farm.xml';
+		end else
+			FileName := Path+'Settings\SHs_Farm.xml';
+	end;
+	
+	// Sorcerers
+	if (_CurrentClass = 'Sorcerer') then
+		FileName := Path+'Settings\Sorcerers_AQ.xml';
+	
+	// SPSs
+	if (_CurrentClass = 'SpellSinger') then
+		FileName := Path+'Settings\SPSs.xml';
+	
+	// Summoners
+	if (_CurrentClassType = 'SummonerClass') then
+		FileName := Path+'Settings\Summoners.xml';
+	
+	// Warcryers
+	if (_CurrentClass = 'Warcryer') then
+		FileName := Path+'Settings\Warcryers.xml';
+	
+	// DarkAvenger Tank
+	if (_CurrentClass = 'DarkAvenger') then
+		FileName := Path+'Settings\DarkAvenger_Tank.xml';
+	
+	// TreasureHunter
+	if (_CurrentClass = 'TreasureHunter') then begin
+		if (_FarmTarget = 'TTRecipeQuest') then
+			FileName := Path+'Settings\TH_TTRecipeQuest.xml'
+		else
+			FileName := Path+'Settings\TH.xml';
+	end;
+	
+	// Spoiler
+	if (_CurrentClass = 'Spoiler') then begin
+		if Contains(_FarmTarget, 'Party') then begin
+			if Contains(_FarmTarget, 'FOGFarm') then begin
+				FileName := Path+'Settings\Spoiler_FOGFarm.xml';
+				ZoneFile := Path+'Zones\FOG_Lower.zmap';
+			end else
+				FileName := Path+'Settings\Spoiler_Leader.xml';
+		end
+		else begin
+			if (_FarmTarget = 'VarkaFarm') then begin
+				FileName := Path+'Settings\Spoiler_Varka.xml';
+				ZoneFile := Path+'Zones\Varka.zmap';
+			end else
+				FileName := Path+'Settings\Spoiler.xml';
+		end;
+	end;
+	
+	// Загрузка настроек и зоны
+	if FileExists(FileName) then
+		Engine.LoadConfig(FileName);
+		
+	if FileExists(ZoneFile) then
+		Engine.LoadZone(ZoneFile);
+	
+end;
+
+procedure ActivateShots();
+var
+	Weapon, Item: TL2Item; WeaponGrade: cardinal; i: integer;
+	_CurrentClassType, tmp_str: string; ActivateSoulshots: boolean; ShotID: integer;
+begin
+	ShotID := 0;
+	Weapon := nil;
+	
+	// Ищем одетое на персонаже оружие
+	for i := 0 to Inventory.User.Count - 1 do begin
+		Item := Inventory.User.Items(i);
+		if (Item <> nil) and Item.Equipped and (Item.ItemType = 0) then begin
+			Weapon := Item;
+			Break;
+		end;
+	end;
+	if Weapon = nil then Exit;
+	
+	// Получаем грейд оружия
+	WeaponGrade := Weapon.Grade;
+	
+	// Soulshots или spiritshots
+	_CurrentClassType := GetGlobalStrVar(CurrentClassType); 
+	ActivateSoulshots := (_CurrentClassType = 'WarriorClass') or (_CurrentClassType = 'TankClass');
+	
+	// Получаем ShotID
+	if ActivateSoulshots then begin
+		if WeaponGrade = 1 then
+			ShotID := 1463
+		else if WeaponGrade = 2 then
+			ShotID := 1464
+		else if WeaponGrade = 3 then
+			ShotID := 1465
+		else if WeaponGrade = 4 then
+			ShotID := 1466
+		else if WeaponGrade = 5 then
+			ShotID := 1467;
+	end
+	else begin
+		if WeaponGrade = 1 then
+			ShotID := 3948
+		else if WeaponGrade = 2 then
+			ShotID := 3949
+		else if WeaponGrade = 3 then
+			ShotID := 3950
+		else if WeaponGrade = 4 then
+			ShotID := 3951
+		else if WeaponGrade = 5 then
+			ShotID := 3952;
+	end;
+	if ShotID = 0 then Exit;
+	
+	// Проверяем в инвентаре наличие нужных shots по грейду и типу
+	if UserHasItem(ShotID, tmp_str) then
+		Engine.DAutoSoulShot(ShotID, True); // Активируем
+end;
+
+// Community board & Dialog +
+function RunCBSequence(const Cmds: array of string; CloseAltB: boolean): Boolean;
+var
+	i: Integer;
+	TimeoutMs, DelayMs: Cardinal;
+begin
+	Result := False;
+	TimeoutMs := 3000;
+	DelayMs := 500;
+	
+	for i := Low(Cmds) to High(Cmds) do begin
+		if not SendCB(Cmds[i], TimeoutMs) then Exit;
+		Delay(DelayMs);
+	end;
+
+	if CloseAltB then
+		ToggleAltB();
+	
+	Result := True;
+end;
+
+function SendCB(const Bypass: string; TimeoutMs: Cardinal): Boolean;
+var
+	t0, t: Cardinal;
+begin
+	t := Engine.CBTime;
+	Engine.BypassToServer(Bypass);  // отправили команду
+
+	t0 := GetTickCount;
+	while (Engine.CBTime = t) and (GetTickCount - t0 < TimeoutMs) do
+		Delay(50);
+	
+	Result := (Engine.CBTime <> t);
+end;
+
+procedure ToggleAltB;
+begin
+	Engine.UseKey(18 {VK_MENU}, 1);      // Alt down
+	Delay(30);
+	Engine.UseKey(Ord('B'), 1);          // B down
+	Delay(30);
+	Engine.UseKey(Ord('B'), 2);          // B up
+	Delay(30);
+	Engine.UseKey(18 {VK_MENU}, 2);      // Alt up
+end;
+
+function RunDialogSequence(const Cmds: array of string): Boolean;
+var
+	i: Integer;
+	TimeoutMs, DelayMs: Cardinal;
+begin
+	// Применение: if not RunDialogSequence(['Баффер', '00', '08']) then Exit;
+	
+	// Первым элементом Имя NPC, потом Гиперссылки
+	Result := False;
+	TimeoutMs := 3000;
+	DelayMs := 500;
+	
+	if (Cmds[0] <> '') then begin
+		Engine.SetTarget(Cmds[0]);
+		Delay(DelayMs);
+		
+		if not Engine.DlgOpen(TimeoutMs) then Exit;
+		Delay(DelayMs);
+	end;
+
+	for i := 1 to High(Cmds) do begin
+		if not Engine.BypassToServer(Cmds[i]) then Exit;
+		Delay(DelayMs);
+	end;
+	
+	Engine.CancelTarget;
+
+	Result := True;
+end;
+// Community board & Dialog  -
+
+function PartyExecuteEntry(const Cmd: string): Boolean;
+var
+	BotNames: TStringArray; SelectedBot: TBot; i: integer; TempCmd, _FarmTarget: string;
+begin
+	// if PartyExecuteEntry('Command') then Exit;
+	
+	if (Cmd = 'ResToTown') or (Cmd = 'WaitOutOfCombat') or (Cmd = 'GMBuff') or Contains(Cmd, 'TP ') or (Cmd = 'StartCombat') or (Cmd = 'StopCombat') then
+		Result := true
+	else // HaveAggroMobsIncludeSuspicious, HaveAggroMobs, NeedRebuff
+		Result := false;
+	
+	_FarmTarget := GetGlobalStrVar(FarmTarget);
+	if not Contains(_FarmTarget, 'Raid') and not Contains(_FarmTarget, 'Party') then Exit;
+	if (Party.Chars.Count = 0) or (Party.Leader.OID <> User.OID) then Exit;
+	
+	BotNames := GetBotNicknames();
+	for i := 0 to High(BotNames) do begin
+		if SameText(BotNames[i], User.Name) or (not IsInParty(BotNames[i])) then Continue;
+		if (not BotList.ByName(BotNames[i], SelectedBot)) or (SelectedBot.Control = nil) then Continue;
+		
+		TempCmd := Cmd;
+		Result := SelectedBot.Control.Entry(TempCmd);
+//Print('Char: '+BotNames[i]+'; Execute: '+Cmd+'; Result: '+BoolToStr(Result));
+		
+		if Result then begin
+			if (Cmd = 'HaveAggroMobsIncludeSuspicious') or (Cmd = 'NeedRebuff') or (Cmd = 'HaveAggroMobs') then
+				Exit;
+		end else begin
+			if (Cmd = 'ResToTown') or (Cmd = 'WaitOutOfCombat') or (Cmd = 'GMBuff') or Contains(Cmd, 'TP ') or (Cmd = 'StartCombat') or (Cmd = 'StopCombat') then
+				Exit;
+		end;
+	end;
+end;
+
+procedure TradeItems(const ItemsArray: array of Integer);
+var
+	Cnt, ItemID, i, j: Integer; Packet: string; ItemUID: Cardinal; It: TL2Item;
+begin
+	for i := 0 to High(ItemsArray) do begin
+		ItemID := ItemsArray[i];
+		
+		// Перебираем весь инвентарь и отправляем каждый стак отдельно
+		for j := 0 to Inventory.User.Count - 1 do begin
+			It := Inventory.User.Items(j);
+			if It = nil then Continue;
+
+			if It.ID = ItemID then begin
+				ItemUID := It.OID;
+				Cnt := It.Count;
+				
+				if (ItemUID <> 0) and (Cnt > 0) then begin
+					Packet := '1601000000' + MemToHex(ItemUID, 4) + MemToHex(Cnt, 4);
+					Engine.SendToServer(Packet);
+					Delay(200);
+				end;
+			end;
+		end;
+	end;
+	
+	Engine.SendToServer('1701000000');
+end;
+
+function PartyLeaderBugFix(): Boolean;
+var
+  BotNames: TStringArray; SelectedBot: TBot; i, j: Integer; PLName, SwapName: string; _Char: TL2Char; t0: Cardinal;
+begin
+	Result := False;
+	
+	if (Party.Leader.OID <> User.OID) or not IsInArray(User.Name, PLs) then Exit;
+	
+	// Проверяем: хоть у одного бота лидер отличается (значит есть рассинхрон)
+	BotNames := GetBotNicknames();
+	for i := 0 to High(BotNames) do begin
+	
+		if (not SameText(BotNames[i], User.Name)) and IsInParty(BotNames[i])
+		 and BotList.ByName(BotNames[i], SelectedBot) and (SelectedBot.Control <> nil)
+		 and (SelectedBot.Control.GetParty.Leader.OID <> User.OID) then begin
+			
+			Print('PartyLeaderBugFix');
+			
+			SwapName := BotNames[i];
+			
+			// 1) от "меня" (текущего окна) отдаём лидера SwapName
+			if Engine.SetPartyLeader(SwapName) then begin
+				t0 := GetTickCount;
+				while (GetTickCount - t0 < 2000) do begin
+					if SameText(Party.Leader.Name, SwapName) then begin
+						// 2) от лица SwapName отдаём лидера обратно
+						t0 := GetTickCount;
+						while (GetTickCount - t0 < 2000) do begin
+							if SameText(Party.Leader.Name, User.Name) then
+								Break
+							else
+								SelectedBot.Control.SetPartyLeader(User.Name);
+							Delay(100);
+						end;
+						
+						if not SameText(Party.Leader.Name, User.Name) then
+							Print('PartyLeaderBugFix. Ошибка передачи PL обратно на '+User.Name);
+							
+						Break;
+					end;
+					Delay(100);
+				end;
+			end;
+			
+			Exit;
+			
+		end;
+    end;
+	
+	// если рассинхрона не нашли — считаем, что всё ок
+	Result := True;
+end;
+
+function SpoilAndKillMob(MobID: Cardinal): Boolean;
+var
+	Mob, t0, t1, TimeoutMs: Cardinal; Spoiled: Boolean; n, m: Integer; Msg: TChatMessage;
+begin
+	Result := False;
+	TimeoutMs := 60000;
+	
+	// найти моба по ID
+	Mob := 0;
+	t0 := GetTickCount;
+	while (Mob = 0) and (GetTickCount - t0 < TimeoutMs) do begin
+		Mob := GetNearestMob(False, MobID); // вернёт OID
+		Delay(500);
+	end;
+	if Mob = 0 then Exit;
+	
+	// атаковать и дождаться входа в бой
+	Engine.SetTarget(Mob);
+	Delay(200);
+	Engine.Attack(100);
+	
+	t0 := GetTickCount;
+	while (not User.InCombat) and (GetTickCount - t0 < TimeoutMs) do
+		Delay(500);
+	if not User.InCombat then Exit;
+	
+	// бой: пытаться спойлить, пока цель жива
+	SetGlobalBoolVar(SuccessfulSpoil, false);
+	while (not User.Target.Dead) and (GetTickCount - t0 < TimeoutMs) do begin
+		if not GetGlobalBoolVar(SuccessfulSpoil) and Engine.UseSkill(254) then begin
+			while (User.Cast.EndTime > 0) and (GetTickCount - t0 < TimeoutMs) do
+				Delay(100);
+		end;
+		Engine.Attack(100);
+	end;
+	
+	if not User.Target.Dead then Exit;
+	
+	// свип
+	Delay(300);
+	if User.Target.Sweepable then
+		Engine.UseSkill(42);
+	
+	Result := True;
+end;
+
+// Работа с Зонами +
+function DetectCurrentZone(const Folder: string; const Names: array of string): string;
+var
+	i: Integer;
+	FileName: string;
+begin
+	Result := '';
+
+	for i := Low(Names) to High(Names) do begin
+		FileName := Folder + Names[i] + '.zmap';
+		if not FileExists(FileName) then Continue;
+		
+		Engine.LoadZone(FileName);
+		Delay(100);
+		
+		if Engine.InZone(User) then begin
+			Result := Names[i];
+			Exit;
+		end;
+	end;
+end;
+
+function FarmCurrentZone(): Boolean;
+begin
+	Result := True;
+	StartCombat();
+	
+	try
+		while Delay(500) do begin
+			if (Engine.Status <> lsOnline) then begin
+				Result := False;
+				Exit;
+			end;
+			
+			if not ZoneHasAliveMobs then
+				Exit;
+		end;
+	finally
+		StopCombat();
+	end;
+end;
+
+function ZoneHasAliveMobs: Boolean;
+var
+	i: Integer; Mob: TL2Npc; Obj: TL2Object;
+begin
+	Result := False;
+
+	for i := 0 to NpcList.Count - 1 do begin
+		Mob := TL2Npc(NpcList.Items(i));
+		if (Mob <> nil) and Mob.Valid and (not Mob.Dead) and (not Mob.Invisible)
+		 and (not Mob.IsPet) and Mob.Attackable and (not CharList.ByOID(Mob.OID, Obj))
+		 and Mob.InZone and (Abs(Mob.Z - User.Z) < 300) then begin
+			Result := True;
+			Exit;
+		end;
+	end;
+end;
+// Работа с Зонами -
+
+// Сервисные методы +
+function GetGlobalStrVar(var V: string): string;
+begin
+	Script.Lock;
+	try
+		Result := V;
+	finally
+		Script.UnLock;
+	end;
+end;
+
+procedure SetGlobalStrVar(var V: string; const Value: string);
+begin
+	Script.Lock;
+	try
+		V := Value;
+	finally
+		Script.UnLock;
+	end;
+end;
+
+function GetGlobalBoolVar(var V: boolean): boolean;
+begin
+	Script.Lock;
+	try
+		Result := V;
+	finally
+		Script.UnLock;
+	end;
+end;
+
+procedure SetGlobalBoolVar(var V: boolean; Value: boolean);
+begin
+	Script.Lock;
+	try
+		V := Value;
+	finally
+		Script.UnLock;
+	end;
+end;
+
+function EntryCmd(const S: string): boolean;
+var
+	T: string;
+begin
+	T := S;
+	Result := OnEntry(T);
+end;
+
+function BoolToStr(const V: boolean): string;
+begin
+	if V then
+		Result := 'True'
+	else
+		Result := 'False';
+end;
+
+function IsInArray(const Name: string; const Arr: array of string): boolean;
+var
+	i: Integer;
+begin
+	Result := False;
+	if Length(Arr) = 0 then Exit;
+	for i := Low(Arr) to High(Arr) do
+		if SameText(Arr[i], Name) then begin
+			Result := True;
+			Exit;
+		end;
+end;
+
+function IsInArrayTStringArray(const Name: string; const Arr: TStringArray): boolean;
+var
+	i: Integer;
+begin
+	Result := False;
+	if Length(Arr) = 0 then Exit;
+	for i := Low(Arr) to High(Arr) do
+		if SameText(Arr[i], Name) then begin
+			Result := True;
+			Exit;
+		end;
+end;
+
+function Contains(const S, Sub: string): Boolean;
+begin
+	// регистрозависимо — в твоём тексте "штраф на награду" в нижнем регистре, так что ок
+	Result := Pos(LowerCase(Sub), LowerCase(S)) > 0;
+end;
+
+function IsInParty(const Name: string): boolean;
+var
+	P: TL2Char;
+begin
+	Result := Party.Chars.ByName(Name, P) and (P <> nil) and P.Valid;
+end;
+
+function TickReached(Target: Cardinal): Boolean;
+begin
+	Result := Integer(GetTickCount - Target) >= 0;
+end;
+
+// Debug +
+procedure PrintStringTStringArray(const Title: string; const A: TStringArray);
+var
+	i: Integer;
+begin
+	// приминение PrintStringTStringArray('CurrentlyAliveEpic', CurrentlyAliveEpic);
+	Print(Title + ' (len=' + IntToStr(Length(A)) + '):');
+	if Length(A) = 0 then begin
+		Print('  <empty>');
+		Exit;
+	end;
+
+	for i := 0 to High(A) do
+	Print('  [' + IntToStr(i) + '] ' + A[i]);
+end;
+// Debug -
+
+// События +
+function OnEntry(var Cmd: string): Boolean;
+var
+	VarName, VarValue: string;
+	R: TRegExpr;
+begin
+	if (Cmd <> 'NeedRebuff') then
+		Print('Получена команда: '+Cmd);
+	
+	Result := False;
+
+	while CharacterIsBusy do
+		Delay(500);
+
+	CharacterIsBusy := True;
+	try
+		if Cmd = 'Login' then begin
+			if LoginToGame_IfNeeded then begin
+				Print(User.Name+' is online');
+				Result := True;
+				//LogoutToCharSelect;
+			end;
+		end
+		else if Contains(Cmd, 'SetGlobalStrVar') then begin
+			// SetGlobalStrVar(FarmTarget,Raid Longhorn Golkonda)
+			VarName  := '';
+			VarValue := '';
+			R := TRegExpr.Create;
+			try
+				R.Expression := '^SetGlobalStrVar\(([A-Za-z0-9_]+),([^)]+)\)$';
+				if R.Exec(Trim(Cmd)) then begin
+					VarName  := Trim(R.Match[1]);
+					VarValue := Trim(R.Match[2]);
+				end;
+			finally
+				R.Free;
+			end;
+			
+			if SameText(VarName, 'FarmTarget') then begin
+				SetGlobalStrVar(FarmTarget, VarValue);
+				SetGlobalBoolVar(Initial, true);
+				Result := True;
+			end;
+		end
+		else if Contains(Cmd, 'ResToTown') then begin
+			ResToTown();
+			Result := True;
+		end
+		else if Contains(Cmd, 'TP ') and (GetGlobalStrVar(CurrentClassType) <> 'SummonerClass') then begin
+			Result := TP(Cmd);
+		end
+		else if Contains(Cmd, 'Summon party') then begin
+			// Summon party
+			if GetGlobalStrVar(CurrentClassType) = 'SummonerClass' then begin
+				SummonParty();
+				Result := True;
+			end;
+		end
+		else if Contains(Cmd, 'GMBuff') then begin
+			Result := GMBuff();
+		end
+		else if Contains(Cmd, 'StartCombat') then begin
+			StartCombat();
+			Result := true;
+		end
+		else if Contains(Cmd, 'StartCombatExitFight') then begin
+			StartCombat('ExitFight');
+			Result := true;
+		end
+		else if Contains(Cmd, 'StopCombat') then begin
+			StopCombat();
+			Result := true;
+		end
+		else if Contains(Cmd, 'NeedRebuff') then begin
+			Result := NeedRebuff(false, GetGlobalStrVar(FarmTarget));
+		end
+		else if Contains(Cmd, 'HaveAggroMobsIncludeSuspicious') then begin
+			Result := HaveAggroMobsIncludeSuspicious();
+		end
+		else if Contains(Cmd, 'HaveAggroMobs') then begin
+			Result := HaveAggroMobs();
+		end
+		else if Contains(Cmd, 'WaitOutOfCombat') then begin
+			Result := WaitOutOfCombat(60000);
+		end
+		else
+			Print('Неизвестная команда');
+	finally
+		CharacterIsBusy := False;
+	end;
+end;
+
+procedure OnAction(Action: TL2Action; P1, P2: Pointer);
+var
+	Msg: TChatMessage;
+begin
+	if Action = laChat then begin
+		try
+			if P1 = nil then Exit;
+			Msg := TChatMessage(P1);
+			
+			if (Msg.ChatType = mtParty) or (Msg.ChatType = mtPrivate) then begin
+				ChatQueue_Push(Ord(Msg.ChatType), Copy(Msg.Sender, 1, 64), Copy(Trim(Msg.Text), 1, 500));
+				Script.NewThread(@ChatThread);
+			end;
+		except
+			on E: Exception do Print('Exception OnAction: ' + E.Message);
+		end;
+	end
+	
+	else if Action = laSysMsg then begin
+		if (cardinal(P1) = 104) then
+			Engine.UseKey(27) // VK_ESCAPE
+		else if (cardinal(P1) = 612) then
+			SetGlobalBoolVar(SuccessfulSpoil, true);
+	end;
+end;
+
+{procedure OnCliPacket(ID1, ID2: cardinal; Data: pointer; DataSize: word);
+begin
+	// Сниффер пакетов
+	// Включение: Engine.SendActID(1);
+	Print('C->S ID1=$' + MemToHex(ID1, 2) +
+		' ID2=$' + MemToHex(ID2, 2) +
+		' Data=' + MemToHex(Data^, DataSize)
+	);
+end;}
+// События -
+
+// Работа с чатом +
+procedure ChatQueue_Push(ChatTypeInt: Integer; const Sender, Text: string);
+var
+	L, LT, LS, LX: Integer;
+begin
+	Script.Lock;
+	try
+		LT := Length(ChatQ_Type);
+		LS := Length(ChatQ_Sender);
+		LX := Length(ChatQ_Text);
+		
+		if (LT <> LS) or (LT <> LX) then begin
+			Print('ChatQueue_Push(): Ошибка длины массивов. Reset.');
+			SetLength(ChatQ_Type, 0);
+			SetLength(ChatQ_Sender, 0);
+			SetLength(ChatQ_Text, 0);
+			L := 0;
+		end else
+			L := LT;
+		
+		SetLength(ChatQ_Type,   L + 1);
+		SetLength(ChatQ_Sender, L + 1);
+		SetLength(ChatQ_Text,   L + 1);
+		
+		ChatQ_Type[L]   := ChatTypeInt;
+		ChatQ_Sender[L] := Sender;
+		ChatQ_Text[L]   := Text;
+	finally
+		Script.UnLock;
+	end;
+end;
+
+function ChatQueue_Pop(out ChatTypeInt: Integer; out Sender, Text: string): Boolean;
+var
+	L, i: Integer;
+begin
+	ChatTypeInt := -1;
+	Sender := '';
+	Text := '';
+	Result := False;
+
+	Script.Lock;
+	try
+		L := Length(ChatQ_Type);
+		if (L = 0) then Exit;
+		
+		if (Length(ChatQ_Sender) <> L) or (Length(ChatQ_Text) <> L) then begin
+			Print('ChatQueue_Pop(): Ошибка длины массивов. Reset.');
+			SetLength(ChatQ_Type, 0);
+			SetLength(ChatQ_Sender, 0);
+			SetLength(ChatQ_Text, 0);
+			Exit;
+		end;
+
+		// забираем нулевой элемент
+		ChatTypeInt := ChatQ_Type[0];
+		Sender      := Copy(ChatQ_Sender[0], 1, Length(ChatQ_Sender[0]));
+		Text        := Copy(ChatQ_Text[0], 1, Length(ChatQ_Text[0]));
+
+		// удаляем нулевой элемент: сдвигаем влево
+		for i := 1 to L - 1 do begin
+			ChatQ_Type[i-1]   := ChatQ_Type[i];
+			ChatQ_Sender[i-1] := ChatQ_Sender[i];
+			ChatQ_Text[i-1]   := ChatQ_Text[i];
+		end;
+
+		// уменьшаем длину
+		ChatQ_Sender[L-1] := '';
+		ChatQ_Text[L-1]   := '';
+		SetLength(ChatQ_Type,   L - 1);
+		SetLength(ChatQ_Sender, L - 1);
+		SetLength(ChatQ_Text,   L - 1);
+
+		Result := True;
+	finally
+		Script.UnLock;
+	end;
+end;
+
+procedure PartyChatHandler(const Sender, Text: string);
+var
+	i, Cnt: Integer;
+	ItemName: string;
+begin
+	if Contains(Text, 'find ') then begin
+		if Contains(Text, 'SKeys') then begin
+			for i := Low(SKeys) to High(SKeys) do begin
+				if UserHasItem(SKeys[i], ItemName) then
+					Print('FindItem: ' + ItemName); // Print('FindItem: ' + ItemName + ' x' + IntToStr(Cnt));
+			end;
+		end;
+	end
+	else if Contains(Text, 'TP ') then begin
+		TP(Text);
+	end
+	else
+		EntryCmd(Text);
+end;
+
+procedure PrivateChatHandler(const Sender, Text: string);
+var
+	i: Integer;
+	ItemName: string;
+begin
+	if Contains(Text, 'Find ') then begin
+		if Contains(Text, 'SKeys') then begin
+			// Find SKeys
+			for i := Low(SKeys) to High(SKeys) do begin
+				if UserHasItem(SKeys[i], ItemName) then
+					Print('FindItem: ' + ItemName);
+			end;
+		end;
+	end
+	else if Contains(Text, 'Trade ') then begin
+		if Contains(Text, 'Materials') then begin
+			// Trade Materials
+			TradeItems(Materials);
+		end
+		else if Contains(Text, 'SKeys') then begin
+			// Trade SKeys
+			TradeItems(SKeys);
+		end
+		else if Contains(Text, 'AM') then begin
+			// Trade Arcana Mace
+			TradeItems([6579]);
+		end;
+	end
+	else
+		EntryCmd(Text);
+end;
+
+function SendChatCmd(const Cmd: string; TimeoutMs: Cardinal): Boolean;
+const
+	WM_KEYDOWN = $0100; WM_KEYUP = $0101; VK_RETURN = 13;
+var
+	dlg0, t0: Cardinal;
+begin
+	Result := False;
+
+	dlg0 := Engine.DlgTime;
+
+	Engine.PostMessage(WM_KEYDOWN, VK_RETURN, 0);
+	Engine.PostMessage(WM_KEYUP,   VK_RETURN, 0);
+	Delay(30);
+	PostText(Cmd); // например ".rb"
+	Delay(30);
+	Engine.PostMessage(WM_KEYDOWN, VK_RETURN, 0);
+	Engine.PostMessage(WM_KEYUP,   VK_RETURN, 0);
+
+	t0 := GetTickCount;
+	while (GetTickCount - t0 < TimeoutMs) do begin
+		if Engine.DlgTime <> dlg0 then begin
+			Result := True;
+			Exit;
+		end;
+	Delay(100);
+	end;
+end;
+
+procedure PostText(const S: string);
+const
+	WM_CHAR = $0102; 
+var
+	i: Integer;
+begin
+	for i := 1 to Length(S) do
+		Engine.PostMessage(WM_CHAR, Ord(S[i]), 0);
+end;
+// Работа с чатом -
+
+function LoginToGame_IfNeeded: Boolean;
+var
+	t0: Cardinal;
+begin
+	if Engine.Status = lsOnline then
+		Exit;
+
+	Engine.AuthLogin('qwq8', '');
+
+	t0 := GetTickCount;
+	while (Engine.LoginStatus < 2) and (GetTickCount - t0 < 120000) do
+		Delay(500);
+
+	Engine.GameStart(-1);
+
+	t0 := GetTickCount;
+	while (Engine.Status <> lsOnline) and (GetTickCount - t0 < 120000) do
+		Delay(500);
+
+	if Engine.Status <> lsOnline then
+		Print(User.Name+' не вышел в онлайн (таймаут)');
+end;
+
+// Threads +
+procedure DeathPenaltyThread;
+begin
+	while Delay(10000) do begin
+		if Engine.Status <> lsOnline then
+			Continue;
+			
+		if (User.DeathPenalty > 0) then begin
+			if (User.Level > 75) then
+				Engine.UseItem(8599);
+		end;
+	end;
+end;
+
+procedure IngameBotProtectionBypass;
+var
+	txt: string;
+begin
+	while Delay(1000) do begin
+		if Engine.Status <> lsOnline then
+			Continue;
+			
+		txt := Engine.DlgText;
+
+		if Contains(txt, 'штраф на награду') then begin
+			// нажимаем "Продолжить"
+			Engine.BypassToServer('00');
+		end;
+		
+		if Contains(txt, 'При создании персонажа необходимо установить') then begin
+			// нажимаем "Продолжить"
+			Engine.BypassToServer('00 123 123');
+		end;
+	end;
+end;
+
+procedure DestroyItemsThread();
+var
+	i: integer;
+	Item: TL2Item;
+begin
+	while Delay(10000) do begin
+		
+		if Engine.Status <> lsOnline then
+			Continue;
+			
+		for i:=0 to Length(DestroyArray)-1 do begin
+			if Inventory.User.ByID(DestroyArray[i], Item) then begin
+				Engine.DestroyItem(Item, Item.Count);
+				Delay(200);
+			end;
+		end;
+	end;
+end;
+
+procedure RBMonitorThread();
+const 
+	RBRegExp = '<tr><td>([^<]+)</td><td>[0-9]+</td><td><font[^>]*color=00FF00[^>]*>[^<]*</font></td></tr>';
+	EpicRegExp = '<tr><td[^>]*>([^<]+)</td><td[^>]*><font[^>]*color="([0-9A-Ea-e][0-9A-Fa-f]{5}|[Ff][0-9A-Ea-e][0-9A-Fa-f]{4}|[Ff][Ff][1-9A-Fa-f][0-9A-Fa-f]{3}|[Ff][Ff]0[1-9A-Fa-f][0-9A-Fa-f]{2}|[Ff][Ff]00[1-9A-Fa-f][0-9A-Fa-f]|[Ff][Ff]000[1-9A-Fa-f])">[^<]*</font></td></tr>';
+var
+	html: string;
+	CurrentlyAliveRB, CurrentlyAliveEpic: TStringArray;
+	rbLen, i: Integer;
+begin
+	while Delay(50000) do begin
+		if Engine.Status <> lsOnline then
+			Exit;
+			
+		html := '';
+		if SendChatCmd('.rb', 1000) then begin
+			html := Engine.DlgText;
+			Delay(200);
+		end;
+		if html = '' then
+			Continue;
+		CurrentlyAliveRB := ParseAliveBosses(html, RBRegExp);
+		
+		Delay(10000);
+		html := '';
+		if SendChatCmd('.epic', 1000) then begin
+			html := Engine.DlgText;
+			Delay(200);
+		end;
+		if html = '' then
+			Continue;
+		CurrentlyAliveEpic := ParseAliveBosses(html, EpicRegExp);
+		
+		rbLen := Length(CurrentlyAliveRB);
+		SetLength(CurrentlyAliveRB, rbLen + Length(CurrentlyAliveEpic));
+		for i := 0 to High(CurrentlyAliveEpic) do
+			CurrentlyAliveRB[rbLen + i] := CurrentlyAliveEpic[i];
+		
+		UpdateAliveBosses(CurrentlyAliveRB);
+	end;
+end;
+
+procedure DoubleAuthentication;
+var
+	txt: string;
+begin
+	Delay(1000);
+	txt := Engine.DlgText;
+	
+	if Contains(txt, 'Вторичный пароль') then begin
+		// Ввод пароля
+		Engine.BypassToServer('00 123');
+	end;
+end;
+
+procedure ChatThread;
+var
+  ChatTypeInt: Integer;
+  Sender, Text: string;
+  BotNames: TStringArray;
+begin
+	
+	Script.Lock;
+	try
+		if ChatThreadRunning then
+			Exit
+		else
+			ChatThreadRunning := true;
+			
+	finally
+		Script.UnLock;
+	end;
+	
+	try
+		BotNames := GetBotNicknames();
+		while ChatQueue_Pop(ChatTypeInt, Sender, Text) do begin
+			if (not IsInArrayTStringArray(Sender, BotNames)) then Continue;
+			
+			if ChatTypeInt = Ord(mtParty) then
+				PartyChatHandler(Sender, Text)
+			else if ChatTypeInt = Ord(mtPrivate) then begin
+				PrivateChatHandler(Sender, Text);
+			end;
+		end;
+	except
+		on E: Exception do
+			Print('ChatThread(). ClassName: ' + E.ClassName +
+				'. Exception: ' + E.Message + '. type=' + IntToStr(ChatTypeInt) +
+				' from=' + Sender + ' txt=' + Copy(Text, 1, 120)
+			);
+	end;
+	
+	SetGlobalBoolVar(ChatThreadRunning, false); // Причина падения тут
+end;
+// Threads -
+
+procedure Init();
+var
+	_PL: string;
+begin
+	Print('Инициализация');
+	Engine.FaceControl(1, false);
+	
+	_PL := '';
+	if (IsInArray(User.Name, PLs)) then
+		_PL := User.Name;
+	
+	GetClassData();
+	
+	Script.Lock;
+	try
+		PL := _PL;
+		CombatThreadEnabled := false;
+		CombatThreadRunning := false;
+		StakatoThreadEnabled := false;
+		StakatoThreadRunning := false;
+		DisNecrThreadEnabled := false;
+		DisNecrThreadRunning := false;
+		DestroComboThreadEnabled := false;
+		DestroWeaponChangeThreadEnabled := false;
+		ChatThreadRunning := false;
+	finally
+		Script.Unlock;
+	end;
+	
+	DoubleAuthentication();
+	LoadConfig();
+	Engine.SetPerform(1);
+	Engine.FaceControl(1, false);
+	ActivateShots();
+	
+	if User.Name = 'Vaeris' then
+		Script.NewThread(@RBMonitorThread);
+		
+	SetGlobalBoolVar(Initial, false);
+end;
+
+begin
+	
+	Script.Lock;
+	try
+		// DinoStriders, StakatoNest, VarkaFarm, FOGFarm, DisciplesNecropolis
+		// FreeFarm, Raid, Party FOGFarm, Deleveling 43, TTRecipeQuest
+		FarmTarget := 'Raid';
+	finally
+		Script.Unlock;
+	end;
+	
+	SetGlobalBoolVar(Initial, true);
+	
+	Script.NewThread(@MainThread);
+	Script.NewThread(@DestroyItemsThread);
+	Script.NewThread(@IngameBotProtectionBypass);
+	Script.NewThread(@DeathPenaltyThread);
+	
+	Delay(-1);
+	
+end.
