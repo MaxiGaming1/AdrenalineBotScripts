@@ -21,7 +21,7 @@ const
 	];
 	SKeys: array of Integer = [6688,6689,6690,6691,6692,6693,6694,6695,6696,6697,6698,6699,6700,6701,6702,6703,6704,6705,6706,6707,6708,6709,6710,6711,6712,6713,6714,6698,6699,6700 // S Key Material
 	,729,730,959,960,6570,6577,6578 // Заточки
-	,FunCoin,5908,5911,5914,8762,5965 // Fun coin, SA 13, Top LS, Blank Scroll
+	,FunCoin,5908,5911,5914,8762,5965,6622 // Fun coin, SA 13, Top LS, Blank Scroll
 	];
 	Materials: array of Integer = [1864,1865,1866,1867,1868,1869,1870,1871,1872,1873,1874,1875,1876,1877,1878,1879,1880,1881,1882,1883,1884,1885,1886,1887,1888,1889,1890,1891,1892,1893,1894,1895,4039,4040,4041,4042,4043,4044,4045,4046,4047,4048,5549,5550,5551,5552,5553,5554
 	,6342,6344,6346,5509,5485,5546,5508,5521,5496,5497,5526,5525,1461 // A-Grade Keys
@@ -760,7 +760,7 @@ begin
 	_FarmTarget := GetGlobalStrVar(FarmTarget);
 	
 	While Delay(1000) do begin
-		if (Engine.Status <> lsOnline) or (not GetGlobalBoolVar(DestroComboThreadEnabled)) then begin
+		if (not GetGlobalBoolVar(DestroComboThreadEnabled)) or (Engine.Status <> lsOnline) then begin
 			Print('DestroComboThread остановлен');
 			SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, false);
 			SetGlobalBoolVar(DestroComboThreadRunning, false);
@@ -834,6 +834,13 @@ begin
 		
 		// Ждем 30% ХП, бафаем Зил, Френзи, Бетл рор, Рейдж
 		while Delay(250) do begin
+			if (not GetGlobalBoolVar(DestroComboThreadEnabled)) or (Engine.Status <> lsOnline) then begin
+				Print('DestroComboThread остановлен');
+				SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, false);
+				SetGlobalBoolVar(DestroComboThreadRunning, false);
+				Exit;
+			end;
+			
 			if (User.HP > 40) or (not HaveAggroMobs()) then begin
 				EquipItem(Spear);
 				
@@ -866,7 +873,7 @@ begin
 		end;
 		
 		// Могли сдохнуть, пока включались
-		if (Engine.Status <> lsOnline) or (not GetGlobalBoolVar(DestroComboThreadEnabled)) then begin
+		if (not GetGlobalBoolVar(DestroComboThreadEnabled)) or (Engine.Status <> lsOnline) then begin
 			Print('DestroComboThread остановлен');
 			SetGlobalBoolVar(DestroWeaponChangeThreadEnabled, false);
 			SetGlobalBoolVar(DestroComboThreadRunning, false);
@@ -2135,18 +2142,24 @@ begin
 		else if Contains(Target, 'TP Aden') then begin
 			if not Execute_TP(Target, ['_bbshome', '10', '1a'], 146331, 25762, -2013, Radius) then Exit;
 		end
+		else if Contains(Target, 'TP Giran') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '18'], 83400, 147943, -3399, Radius) then Exit;
+		end
 		else if Contains(Target, 'TP Varka_Village') then begin
 			if not RunDialogSequence(['Tatiana', '04', '01', '02']) then Exit;
 		end
 		else if Contains(Target, 'TP FOG_Lower') then begin
 			if not RunDialogSequence(['Tatiana', '04', '01', '0b']) then Exit;
 		end
+		else if Contains(Target, 'TP DisciplesNecropolis') then begin
+			if not Execute_TP(Target, ['_bbshome', '10', '12', '1c'], 172445, -17594, -4894, Radius) then Exit;
+		end
 		else if Contains(Target, 'TP TOI_13') then begin
 			if not MoveToEx(146682, 25801, -2008, StuckReason) then begin Print('MoveToEx failed: ' + StuckReason); Exit; end;
 			if not RunDialogSequence(['Elisa', '02', '01', '09']) then Exit;
 		end
-		else if Contains(Target, 'TP DisciplesNecropolis') then begin
-			if not Execute_TP(Target, ['_bbshome', '10', '12', '1c'], 172445, -17594, -4894, Radius) then Exit;
+		else if Contains(Target, 'TP Antharas') then begin
+			if not RunDialogSequence(['Clarissa', '03', '01', '06']) then Exit;
 		end
 		else if Contains(Target, 'TP AQ') then begin
 			if not Execute_TP(Target, ['_bbshome', '10', '10', '18', '1d'], -9954, 176111, -4157, Radius) then Exit;
